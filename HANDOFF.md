@@ -4,6 +4,10 @@ Last updated: 2026-10-08T19:50:35+05:30. Workspace: `D:aymax`, PowerShell, Wind
 
 ## User intent and constraints
 
+### Dashboard camera scanner (2026-10-09)
+
+Added **Scan with camera** beside upload: live preview, facing-direction switch, and **Capture and inspect**. `CameraScanner.tsx` captures a native-resolution PNG, runs the existing full inspection pipeline with selected settings, opens the result in the console, and stops/aborts on close. `/api/inspections/upload` now accepts `input_source=upload|camera` (upload default); camera uses camera quality profile and saves input_source context plus camera_scan audit actor. File-upload profile behavior is preserved. Camera results are labeled in the inspection heading, audit source and history. Backend suite: 10 tests pass, including camera quality rejection/no inference, persisted provenance/image, upload defaults and invalid source. Actual local camera-source API test on a sample PNG passed full analytics/action output and matching saved image/hash. Local API was restarted to load the feature. See `docs/CAMERA_SCANNING.md`. Webcam permission/switching still needs physical-device testing.
+
 ### Latest change: camera heatmap alignment (2026-10-09)
 
 Camera lag correction: the full-screen analyzed snapshot was covering the live video, creating a frozen-looking preview. The video now stays live at a requested 30 fps, with only the contour outline over it; the matching heatmap snapshot lives in a separate result canvas in the side panel. OpenCV work is capped at 10 Hz on a <=320-pixel-wide tracking frame, with kernel reuse, hidden-tab pausing and an overlay pixel-ratio cap of 1.5. Reduced tracking coordinates map back to full-resolution camera pixels before inference; source-resolution changes are handled. The result canvas is updated once per model result instead of repainted every animation frame. The regression script includes a reduced-to-native crop mapping check. Physical webcam smoothness remains to be confirmed on the user's device.

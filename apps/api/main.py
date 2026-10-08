@@ -317,6 +317,7 @@ def retry_job(identifier: str):
 
 @app.post('/api/inspections/upload', status_code=201, response_model=InspectionResponse, response_model_exclude_none=True)
 async def upload_inspection(request: Request, model: Literal['neu', 'casting'] = Query('casting'),
+                            input_source: Literal['upload', 'camera'] = Query('upload'),
                             process_context: Literal['nominal', 'thermal_drift'] = Query('nominal'),
                             patchcore_model: str = Query('default'),
                             inference_mode: Literal['full', 'sliced'] = Query('full'),
@@ -327,7 +328,7 @@ async def upload_inspection(request: Request, model: Literal['neu', 'casting'] =
                             machine_id: str = Query('M-UPLOAD', min_length=1, max_length=40, pattern=r'^[A-Za-z0-9._-]+$')):
     if model != 'neu' and inference_mode == 'sliced':
         raise HTTPException(422, 'SAHI sliced inference is available only for the NEU YOLO model')
-    content, frame, media, quality = await uploaded_frame(request, PROFILES[model])
+    content, frame, media, quality = await uploaded_frame(request, 'camera' if input_source == 'camera' else PROFILES[model])
     stored = {'id': str(uuid4()), 'created_at': utc_now(), 'sha256': hashlib.sha256(content).hexdigest(),
               'media_type': media, 'content': content, 'quality': quality}
     await run_in_threadpool(repo.save_frame, stored)
@@ -344,6 +345,8 @@ async def upload_inspection(request: Request, model: Literal['neu', 'casting'] =
         await run_in_threadpool(repo.save_model_run, run | {'id': run_id, 'created_at': utc_now(), 'frame_id': stored['id'],
                                 'image_sha256': stored['sha256'], 'quality': quality})
     result = await run_in_threadpool(create_upload_inspection, stored, frame.shape, model, process_context, lot_id, machine_id, run, run_id, patchcore_model, frame, part_diameter_mm, mm_per_px)
+    result['context']['input_source'] = input_source
+    result['audit'][0]['actor'] = 'camera_scan' if input_source == 'camera' else 'upload'
     try: return await run_in_threadpool(repo.save, result)
     except ValueError as error: raise HTTPException(409, str(error))
 

@@ -16,7 +16,7 @@ export type UploadedInspection = {
   defects: Defect[];
   quality: { passed: boolean; rejection_reasons?: string[]; profile_note?: string };
   calibration?: { mm_per_px?: number | null; source?: string; part_outline?: string };
-  context?: { model: 'neu' | 'casting'; patchcore_model?: string | null; anomaly?: Anomaly | null; geometry?: Geometry | null; part_shape_hint?: string; routing_note?: string };
+  context?: { model: 'neu' | 'casting'; input_source?: 'upload' | 'camera'; patchcore_model?: string | null; anomaly?: Anomaly | null; geometry?: Geometry | null; part_shape_hint?: string; routing_note?: string };
 };
 
 const human = (value: string) => value.replaceAll('_', ' ');
@@ -62,7 +62,7 @@ export default function UploadedPanel({ inspection }: { inspection: UploadedInsp
     : null;
 
   return <>
-    <div className="panel-heading"><h2>Component inspection</h2><span>{casting ? 'PatchCore' : 'YOLO11n'}</span></div>
+    <div className="panel-heading"><h2>{context?.input_source === 'camera' ? 'Camera inspection' : 'Component inspection'}</h2><span>{casting ? 'PatchCore' : 'YOLO11n'}</span></div>
     <p className="muted">Shape hint: {context?.part_shape_hint === 'disc_like_round_outline' ? 'round-disc-like outline' : 'flat surface or unresolved outline'} ? geometric cue only</p>
     <InspectionImage src={inspection.image_url} defects={defects} anomaly={anomaly} geometry={geometry} markers={markers} alt={top ? `Uploaded image with ${defects.length} model finding${defects.length === 1 ? '' : 's'}` : 'Uploaded image with no model findings'} />
     <div className={`finding${anomaly?.flagged || top ? ' flagged' : ''}`}><h3>{heading}</h3>{top && <span className={`status ${top.severity.level}`}>{human(top.severity.level)}</span>}</div><p className="muted">Proxy result / not brake-disc validated</p><details className="evidence-disclosure"><summary>Measurement & model details</summary><p>{explanation}</p><p className="muted">{modelName}</p>

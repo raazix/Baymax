@@ -36,6 +36,34 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return response.json()
 
+    def test_camera_scan_quality_and_audit_provenance(self):
+        # A blank camera scan is persisted for recapture and must never reach inference.
+        ok, image = cv2.imencode('.png', np.full((480, 640, 3), 128, dtype=np.uint8))
+        self.assertTrue(ok)
+        with patch.object(main.patchcore_detector, 'detect') as detect:
+            response = self.client.post('/api/inspections/upload?input_source=camera&model=casting',
+                                        content=image.tobytes(), headers={'Content-Type': 'image/png'})
+        self.assertEqual(response.status_code, 201, response.text)
+        result = response.json()
+        self.assertEqual(result['quality']['profile'], 'camera')
+        self.assertEqual(result['context']['input_source'], 'camera')
+        self.assertEqual(result['audit'][0]['actor'], 'camera_scan')
+        self.assertEqual(result['disposition'], 'recapture')
+        self.assertIsNone(result.get('analytics'))
+        detect.assert_not_called()
+        stored = self.client.get(f"/api/inspections/{result['id']}").json()
+        self.assertEqual(stored['context']['input_source'], 'camera')
+        self.assertEqual(self.client.get(result['image_url']).content, image.tobytes())
+
+    def test_upload_input_source_defaults_and_validation(self):
+        _, image = cv2.imencode('.png', np.full((480, 640, 3), 128, dtype=np.uint8))
+        response = self.client.post('/api/inspections/upload', content=image.tobytes(), headers={'Content-Type': 'image/png'})
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(response.json()['context']['input_source'], 'upload')
+        self.assertEqual(response.json()['quality']['profile'], 'casting_proxy')
+        invalid = self.client.post('/api/inspections/upload?input_source=invalid', content=image.tobytes(), headers={'Content-Type': 'image/png'})
+        self.assertEqual(invalid.status_code, 422)
+
     def test_durable_deferred_job_and_projections(self):
         record = self.replay(analytics_mode='deferred')
         self.assertEqual(record['action']['status'], 'awaiting_analytics')

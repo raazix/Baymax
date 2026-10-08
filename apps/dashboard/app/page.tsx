@@ -16,12 +16,13 @@ import HistorySensors from './HistorySensors';
 
 const RotorViewer = dynamic(() => import('./RotorViewer'), { ssr: false, loading: () => <p className="muted">Loading 3D view…</p> });
 const MarkerARViewer = dynamic(() => import('./MarkerARViewer'), { ssr: false });
+const CameraScanner = dynamic(() => import('./CameraScanner'), { ssr: false });
 
 type Defect = { label: string; confidence?: number; length_mm?: number; equivalent_diameter_mm?: number; r_mm?: number; theta_deg?: number; zone: string; severity: { level: string; reason: string }; bbox_xyxy_px?: number[]; length_px?: number; anomaly_score?: number; threshold?: number; anomaly_grid?: number[][]; cells_over_threshold?: number };
 type Inspection = {
   id: string; part_id: string; lot_id: string; machine_id: string; created_at: string;
   scenario: string; source: string; image_url: string; image_sha256: string;
-  context?: { model: 'neu' | 'casting'; process_context: string; telemetry_source: string; patchcore_model?: string | null; anomaly?: { score: number; threshold: number; flagged: boolean; grid: number[][] } | null; inference?: { mode: 'full' | 'sliced'; engine?: string; tile_size_px?: number; overlap_ratio?: number; tile_count?: number; inference_ms?: number } | null };
+  context?: { model: 'neu' | 'casting'; input_source?: 'upload' | 'camera'; process_context: string; telemetry_source: string; patchcore_model?: string | null; anomaly?: { score: number; threshold: number; flagged: boolean; grid: number[][] } | null; inference?: { mode: 'full' | 'sliced'; engine?: string; tile_size_px?: number; overlap_ratio?: number; tile_count?: number; inference_ms?: number } | null };
   disposition: string; quality: { passed: boolean; rejection_reasons?: string[]; profile?: string; profile_note?: string }; defects: Defect[];
   telemetry: Record<string, number>;
   analytics: null | { rca: { hypothesis: string; confidence: number | null; method: string; feature_contributions: { feature: string; heuristic_risk_contribution?: number; contribution?: number }[] }; forecast: { risk: number; method: string }; uncertainty: { interval_95: number[]; breach_probability: number; simulations: number } };
@@ -58,6 +59,7 @@ export default function Dashboard() {
   const [castingModel, setCastingModel] = useState('mpdd_metal_plate');
   const [presenter, setPresenter] = useState(false);
   const [arOpen, setArOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [partDiameter, setPartDiameter] = useState('');
   const [demo, setDemo] = useState<{ lot: string; target?: string; done: string[] }>({ lot: '', done: [] });
   const [demoStatus, setDemoStatus] = useState('');
@@ -106,8 +108,9 @@ export default function Dashboard() {
       await audio.play().catch(() => { /* Visible controls remain for browsers that block automatic playback. */ });
     } catch { /* Voice is an optional alert channel; the visual result remains available. */ }
   }
-  async function inspectFile(file: File, options: { model: 'casting' | 'neu'; processContext: string; lot?: string; machine?: string; patchcoreModel?: string; inferenceMode?: 'full' | 'sliced'; tileSize?: number; overlap?: number }): Promise<Inspection> {
+  async function inspectFile(file: File, options: { model: 'casting' | 'neu'; processContext: string; lot?: string; machine?: string; patchcoreModel?: string; inferenceMode?: 'full' | 'sliced'; tileSize?: number; overlap?: number; inputSource?: 'upload' | 'camera'; signal?: AbortSignal }): Promise<Inspection> {
     const params = new URLSearchParams({ model: options.model, process_context: options.processContext });
+    if (options.inputSource) params.set('input_source', options.inputSource);
     if (options.model === 'neu') {
       params.set('inference_mode', options.inferenceMode ?? 'full');
       if (options.inferenceMode === 'sliced') { params.set('tile_size', String(options.tileSize ?? 512)); params.set('overlap', String(options.overlap ?? 0.2)); }
@@ -117,7 +120,7 @@ export default function Dashboard() {
     if (partDiameter.trim() && Number.isFinite(diameter) && diameter > 0) params.set('part_diameter_mm', String(diameter));
     if (options.lot) params.set('lot_id', options.lot);
     if (options.machine) params.set('machine_id', options.machine);
-    const response = await fetch(`/api/inspections/upload?${params}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'image/jpeg' }, cache: 'no-store' });
+    const response = await fetch(`/api/inspections/upload?${params}`, { method: 'POST', body: file, headers: { 'Content-Type': file.type || 'image/jpeg' }, cache: 'no-store', signal: options.signal });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(typeof payload.detail === 'string' ? payload.detail : `Upload failed (${response.status}). Check FastAPI is running on port 8000.`);
@@ -128,6 +131,22 @@ export default function Dashboard() {
     const file = files?.[0];
     if (!file) return;
     void operation(async () => { const result = await inspectFile(file, { model, processContext, patchcoreModel: castingModel, inferenceMode, tileSize, overlap: tileOverlap }); await refresh(result); setTab('inspection'); await autoSpeakAlert(result); });
+  }
+  function openScanner() {
+    stream.current?.getTracks().forEach(track => track.stop()); stream.current = null;
+    setCameraActive(false); setArOpen(false); setScannerOpen(true);
+  }
+  async function scanCamera(file: File, signal: AbortSignal) {
+    setBusy(true); setError('');
+    try {
+      const result = await inspectFile(file, { model, processContext, patchcoreModel: castingModel,
+        inferenceMode, tileSize, overlap: tileOverlap, inputSource: 'camera', signal });
+      if (signal.aborted) return;
+      await refresh(result);
+      if (signal.aborted) return;
+      setScannerOpen(false); setTab('inspection');
+      void autoSpeakAlert(result);
+    } finally { setBusy(false); }
   }
   function decision(value: string) { if (!current) return; void operation(async () => { await refresh(await api<Inspection>(`inspections/${current.id}/decision`, { decision: value, engineer: engineer.trim(), note })); }); }
   function verifyFiles(files: FileList | null) {
@@ -258,6 +277,7 @@ export default function Dashboard() {
       {(tab === 'inspection' || tab === 'audit') && <section className="upload-workspace" aria-label="Image inspection">
         <div className="upload-controls">
           <div className="capture-model"><span>Automatic image inspection</span><strong>{castingModelLabel}</strong></div>
+          <button className="scan-camera-action" disabled={busy || loading} onClick={openScanner}><Camera size={17} /> Scan with camera</button>
           <label className={`file-button primary-file${busy || loading ? ' disabled' : ''}`}>{busy ? 'Processing image?' : 'Upload one image'}<input type="file" accept="image/jpeg,image/png" disabled={busy || loading} onChange={e => { upload(e.target.files); e.target.value = ''; }} /></label>
         </div>
         <div className="setup-bottom"><p>Image ? quality gate ? anomaly model ? deterministic triage ? traceable result ? automatic evidence summary</p>
@@ -266,7 +286,7 @@ export default function Dashboard() {
       </section>}
       {error && <div className="error" role="alert">{error}<button onClick={() => void operation(async () => { const data = await api<Inspection[]>('inspections'); setRecords(data); setCurrent(data[0] || null); })} disabled={busy}>Reconnect</button></div>}
       {alertAudio && <section className="voice-alert panel" aria-label="Spoken critical inspection alert"><strong>Voice alert</strong><span>Critical/high inspection finding · automatic readout</span><audio controls autoPlay src={alertAudio} aria-label="Spoken inspection alert" /></section>}
-      <AnimatePresence mode="wait" initial={false}><motion.div key={tab} className="tab-body" initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: .1 } }} transition={{ duration: reduceMotion ? 0 : .2, ease: [0.16, 1, 0.3, 1] }}>{loading && tab !== 'history' ? <div className="empty" role="status">Loading inspection history…</div> : tab === 'history' ? <HistorySensors /> : tab === 'camera' ? <section className="camera panel"><h2>Capture quality check</h2><p>Check blur and bright reflections with your webcam, then run a trained proxy model below. Marker calibration is not connected yet.</p><video ref={video} autoPlay playsInline muted aria-label="Webcam preview" /><div className="buttons"><button className="primary" onClick={startCamera}>Start camera</button><button onClick={capture} disabled={busy || !cameraActive}>Check frame quality</button><button disabled={!cameraActive} onClick={() => { stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; setCameraActive(false); setCameraStatus('Camera stopped.'); }}>Stop camera</button></div><p role="status">{cameraStatus}</p>{quality && <dl className="measurements"><div><dt>Quality gate</dt><dd>{quality.passed ? 'Pass' : 'Recapture'}</dd></div><div><dt>Laplacian variance</dt><dd>{quality.laplacian_variance}</dd></div><div><dt>Bright pixel fraction</dt><dd>{percent(quality.specular_fraction)}</dd></div></dl>}<p className="footnote">Thresholds are provisional and require validation for your camera and lighting.</p><CameraInference grabFrame={grabFrame} cameraActive={cameraActive} patchcoreModel={castingModel} /></section> : tab === 'lab' ? <ProcessLab /> : tab === 'train' ? <TrainPatchCore onTrained={name => void loadModels(name)} /> : !current ? <section className="empty"><h2>Ready for the first inspection</h2><p>Choose a model above, then upload an image. It runs through the quality gate, the model, severity rules, root-cause and risk analytics, and an engineer decision.</p></section> : tab === 'audit' ? <section className="panel audit"><h2>Inspection evidence</h2><dl><dt>Inspection ID</dt><dd>{current.id}</dd><dt>Image SHA-256</dt><dd className="hash">{current.image_sha256}</dd><dt>Source</dt><dd>{current.source === 'uploaded_image' ? 'Uploaded image with real proxy-model output; process telemetry is a simulated preset' : 'Synthetic geometry and process telemetry'}</dd></dl><h2>Decision history</h2><table><thead><tr><th>Time</th><th>Event</th><th>Engineer</th></tr></thead><tbody>{current.audit.map((event, i) => <tr key={i}><td>{new Date(event.at).toLocaleString()}</td><td>{human(event.event)}</td><td>{event.engineer || (current.source === 'uploaded_image' ? 'Upload pipeline' : 'Replay system')}</td></tr>)}</tbody></table><a className="download" href={`/api/inspections/${current.id}`} target="_blank" rel="noreferrer">Open full evidence JSON</a></section> : <>
+      <AnimatePresence mode="wait" initial={false}><motion.div key={tab} className="tab-body" initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: .1 } }} transition={{ duration: reduceMotion ? 0 : .2, ease: [0.16, 1, 0.3, 1] }}>{loading && tab !== 'history' ? <div className="empty" role="status">Loading inspection history…</div> : tab === 'history' ? <HistorySensors /> : tab === 'camera' ? <section className="camera panel"><h2>Capture quality check</h2><p>Check blur and bright reflections with your webcam, then run a trained proxy model below. Marker calibration is not connected yet.</p><video ref={video} autoPlay playsInline muted aria-label="Webcam preview" /><div className="buttons"><button className="primary" onClick={startCamera}>Start camera</button><button onClick={capture} disabled={busy || !cameraActive}>Check frame quality</button><button disabled={!cameraActive} onClick={() => { stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; setCameraActive(false); setCameraStatus('Camera stopped.'); }}>Stop camera</button></div><p role="status">{cameraStatus}</p>{quality && <dl className="measurements"><div><dt>Quality gate</dt><dd>{quality.passed ? 'Pass' : 'Recapture'}</dd></div><div><dt>Laplacian variance</dt><dd>{quality.laplacian_variance}</dd></div><div><dt>Bright pixel fraction</dt><dd>{percent(quality.specular_fraction)}</dd></div></dl>}<p className="footnote">Thresholds are provisional and require validation for your camera and lighting.</p><CameraInference grabFrame={grabFrame} cameraActive={cameraActive} patchcoreModel={castingModel} /></section> : tab === 'lab' ? <ProcessLab /> : tab === 'train' ? <TrainPatchCore onTrained={name => void loadModels(name)} /> : !current ? <section className="empty"><h2>Ready for the first inspection</h2><p>Choose a model above, then upload an image. It runs through the quality gate, the model, severity rules, root-cause and risk analytics, and an engineer decision.</p></section> : tab === 'audit' ? <section className="panel audit"><h2>Inspection evidence</h2><dl><dt>Inspection ID</dt><dd>{current.id}</dd><dt>Image SHA-256</dt><dd className="hash">{current.image_sha256}</dd><dt>Source</dt><dd>{current.source === 'uploaded_image' ? (current.context?.input_source === 'camera' ? 'Camera capture with real proxy-model output; process telemetry is a simulated preset' : 'Uploaded image with real proxy-model output; process telemetry is a simulated preset') : 'Synthetic geometry and process telemetry'}</dd></dl><h2>Decision history</h2><table><thead><tr><th>Time</th><th>Event</th><th>Engineer</th></tr></thead><tbody>{current.audit.map((event, i) => <tr key={i}><td>{new Date(event.at).toLocaleString()}</td><td>{human(event.event)}</td><td>{event.engineer || (current.source === 'uploaded_image' ? 'Upload pipeline' : 'Replay system')}</td></tr>)}</tbody></table><a className="download" href={`/api/inspections/${current.id}`} target="_blank" rel="noreferrer">Open full evidence JSON</a></section> : <>
         <div className="part-strip"><div><span>Part</span><strong>{current.part_id}</strong></div><div><span>Lot</span><strong>{current.lot_id}</strong></div><div><span>Machine</span><strong>{current.machine_id}</strong></div><div><span>Inspected</span><strong>{new Date(current.created_at).toLocaleTimeString()}</strong></div>{current.context?.inference?.mode === 'sliced' && <div><span>YOLO inference</span><strong>SAHI · {current.context.inference.tile_count} tiles</strong></div>}<span className={`status ${severity}`}>{human(severity)}</span></div>
         <details className="evidence-disclosure pipeline-disclosure"><summary>Pipeline evidence <span>9 inspection stages</span></summary><PipelineTrace inspection={current as unknown as Parameters<typeof PipelineTrace>[0]['inspection']} onJump={jumpTo} /></details>
         <div className="inspection-grid">
@@ -277,9 +297,10 @@ export default function Dashboard() {
         {current.source === 'synthetic_replay' && <section className="panel rotor-panel"><div className="panel-heading"><h2>3D rotor view</h2><span>Procedural model · replay measurements</span></div><RotorViewer defects={current.defects.filter((d): d is Defect & { r_mm: number; theta_deg: number; equivalent_diameter_mm: number } => d.r_mm !== undefined && d.theta_deg !== undefined && d.equivalent_diameter_mm !== undefined)} /></section>}
         {current.source === 'uploaded_image' && current.context?.model === 'casting' && current.context.patchcore_model !== 'mvtec_metal_nut' && (current.context.anomaly?.grid?.length ?? 0) > 0 && <section className="panel rotor-panel"><div className="panel-heading"><div><h2>Inspection heatmap preview</h2><span>PatchCore proxy output</span></div><button className="primary" onClick={() => setArOpen(true)}>Bottle camera heatmap</button></div><p className="muted">Blue is at or below the PatchCore threshold; amber/red is above it. Grid values are model features, not pixel-level defect boundaries.</p><RotorViewer defects={[]} heatmap={{ grid: current.context.anomaly!.grid, threshold: current.context.anomaly!.threshold }} />{arOpen && <MarkerARViewer initialModel={castingModel} onClose={() => setArOpen(false)} />}</section>}
         <InspectionAssistant key={current.id} inspectionId={current.id} />
-        <details className="history panel evidence-disclosure"><summary>Recent inspections <span>{Math.min(records.length, 8)} records</span></summary><div className="table-scroll"><table><thead><tr><th>Part</th><th>Scenario</th><th>Lot / machine</th><th>Disposition</th><th>Action</th><th>Evidence</th></tr></thead><tbody>{records.slice(0, 8).map(record => <tr key={record.id}><td>{record.part_id}</td><td>{labels[record.scenario] ?? human(record.scenario)}</td><td>{record.lot_id} / {record.machine_id}</td><td>{human(record.disposition)}</td><td>{human(record.action.status)}</td><td><button className="text-button" disabled={busy} onClick={() => setCurrent(record)}>Inspect</button></td></tr>)}</tbody></table></div></details>
+        <details className="history panel evidence-disclosure"><summary>Recent inspections <span>{Math.min(records.length, 8)} records</span></summary><div className="table-scroll"><table><thead><tr><th>Part</th><th>Scenario</th><th>Lot / machine</th><th>Disposition</th><th>Action</th><th>Evidence</th></tr></thead><tbody>{records.slice(0, 8).map(record => <tr key={record.id}><td>{record.part_id}</td><td>{record.context?.input_source === 'camera' ? 'Camera scan' : labels[record.scenario] ?? human(record.scenario)}</td><td>{record.lot_id} / {record.machine_id}</td><td>{human(record.disposition)}</td><td>{human(record.action.status)}</td><td><button className="text-button" disabled={busy} onClick={() => setCurrent(record)}>Inspect</button></td></tr>)}</tbody></table></div></details>
       </>}</motion.div></AnimatePresence>
       <footer>LineGuard · Evidence-linked quality control <a href="http://127.0.0.1:8000/docs" target="_blank" rel="noreferrer">API reference</a></footer>
     </main>
+    {scannerOpen && <CameraScanner modelLabel={model === 'casting' ? castingModelLabel : 'YOLO11n / steel surface proxy'} onScan={scanCamera} onClose={() => setScannerOpen(false)} />}
   </div>;
 }
