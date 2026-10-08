@@ -6,24 +6,56 @@ import type { RotorHeatmap } from './RotorViewer';
 
 type Box = { x: number; y: number; width: number; height: number };
 type Cv = any;
+let openCvLoading: Promise<Cv> | null = null;
 
-async function loadOpenCv(): Promise<Cv> {
+function loadOpenCv(): Promise<Cv> {
   const existing = (window as any).cv;
-  if (existing?.Mat) return existing;
-  return await new Promise<Cv>((resolve, reject) => {
-    const script = document.createElement('script');
+  if (existing?.Mat) return Promise.resolve(existing);
+  if (openCvLoading) return openCvLoading;
+
+  openCvLoading = new Promise<Cv>((resolve, reject) => {
+    let settled = false;
+    let poll = 0;
+    const scriptId = 'lineguard-opencv-runtime';
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      window.clearInterval(poll);
+      window.clearTimeout(timeout);
+      document.removeEventListener('error', onError, true);
+      if (error) document.getElementById(scriptId)?.remove();
+      if (error) reject(error);
+      else resolve((window as any).cv);
+    };
+    const check = () => {
+      const candidate = (window as any).cv;
+      if (candidate?.Mat) finish();
+    };
+    const timeout = window.setTimeout(() => {
+      const candidate = (window as any).cv;
+      finish(new Error(candidate
+        ? `OpenCV.js loaded but its WebAssembly runtime did not become ready (calledRun=${Boolean(candidate.calledRun)}).`
+        : 'OpenCV.js loaded without exposing its browser runtime.'));
+    }, 60000);
+
+    const onError = (event: Event) => {
+      const target = event.target;
+      if (target instanceof HTMLScriptElement && target.id === scriptId) finish(new Error('Could not load the OpenCV.js runtime script.'));
+    };
+    document.addEventListener('error', onError, true);
+    const script = document.getElementById(scriptId) as HTMLScriptElement | null ?? document.createElement('script');
+    script.id = scriptId;
     script.src = '/api/opencvjs';
     script.async = true;
-    const timeout = window.setTimeout(() => reject(new Error('OpenCV.js did not initialize.')), 30000);
-    script.onload = () => {
-      const candidate = (window as any).cv;
-      if (!candidate) { window.clearTimeout(timeout); reject(new Error('OpenCV.js runtime is unavailable.')); return; }
-      if (candidate.Mat) { window.clearTimeout(timeout); resolve(candidate); }
-      else candidate.onRuntimeInitialized = () => { window.clearTimeout(timeout); resolve(candidate); };
-    };
-    script.onerror = () => { window.clearTimeout(timeout); reject(new Error('Could not load the OpenCV.js runtime.')); };
-    document.head.appendChild(script);
+    script.onload = check;
+    script.onerror = () => finish(new Error('Could not load the OpenCV.js runtime script.'));
+    poll = window.setInterval(check, 100);
+    if (!script.isConnected) document.head.appendChild(script);
+  }).catch(error => {
+    openCvLoading = null;
+    throw error;
   });
+  return openCvLoading;
 }
 
 export default function MarkerARViewer({ heatmap, onClose }: { heatmap: RotorHeatmap; onClose: () => void }) {
