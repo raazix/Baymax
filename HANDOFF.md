@@ -169,3 +169,6 @@ Final automated suite82 tests PASS (data/final-backend-test.log). All6 MPDD APIc
 
 ## Dashboard MPDD integration
 All six MPDD component proxy models appear under Component anomaly (PatchCore) > Component. Matching-component and brake-disc validation caveats are displayed. Next.js production build and TypeScript checks passed. All six dashboard upload endpoint selections verified against their artifact hashes; local report: data/mpdd_dashboard_upload_test.json. Source repository excludes local datasets, binary model artifacts and inspection database; these remain on the laptop.
+
+## Rounded dashboard refinement
+Updated shared CSS radii, inset graphite navigation, spacing, inputs, evidence tables and mobile control stacking. Next.js production build passes. Desktop screenshot with live MPDD inspection reviewed; screenshots remain in data/browser-check/rounded-ui (ignored by Git). Mobile screenshots captured with Chrome CLI, whose window-size capture may clip at minimum browser width; exact device emulation unavailable in this session. No backend/model changes.
