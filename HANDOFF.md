@@ -1,4 +1,4 @@
-# LineGuard — project handoff and checkpoint tracker
+﻿# LineGuard â€” project handoff and checkpoint tracker
 
 Last updated: 2026-10-08T19:50:35+05:30. Workspace: `D:aymax`, PowerShell, Windows. Read this file first when continuing with Claude, then verify current processes/artifacts.
 
@@ -16,14 +16,14 @@ Last updated: 2026-10-08T19:50:35+05:30. Workspace: `D:aymax`, PowerShell, Wind
 
 ## Architecture and implementation truth
 
-Vision: camera → quality gate → calibration/polar map → slicing/known detection + unknown anomaly → spatial merge → metrology → severity. Deep analytics: traceability/spatial fingerprints → XGBoost + TreeSHAP (ranked association, not causal proof) → PLSR primary / PCR benchmark → Monte Carlo → SOP → engineer approval → verification → audit. AR is a later overlay, not part of inference.
+Vision: camera â†’ quality gate â†’ calibration/polar map â†’ slicing/known detection + unknown anomaly â†’ spatial merge â†’ metrology â†’ severity. Deep analytics: traceability/spatial fingerprints â†’ XGBoost + TreeSHAP (ranked association, not causal proof) â†’ PLSR primary / PCR benchmark â†’ Monte Carlo â†’ SOP â†’ engineer approval â†’ verification â†’ audit. AR is a later overlay, not part of inference.
 
 There are two separate paths today:
 
 1. **Synthetic rotor replay:** fixture detections/geometry, measured-size calculations using synthetic scale, deterministic severity, synthetic telemetry, trained synthetic analytics, action/audit workflow.
-2. **Real proxy image inference:** persisted JPEG/PNG frames → actual YOLO NEU bounding boxes. No fabricated masks, physical size or rotor severity. PatchCore casting proxy is trained and integrated through its separate anomaly endpoint.
+2. **Real proxy image inference:** persisted JPEG/PNG frames â†’ actual YOLO NEU bounding boxes. No fabricated masks, physical size or rotor severity. PatchCore casting proxy is trained and integrated through its separate anomaly endpoint.
 
-Feature coverage estimates communicated: ~70% hackathon backend and ~50–60% whole proposed pipeline. These are rough feature estimates, not production readiness.
+Feature coverage estimates communicated: ~70% hackathon backend and ~50â€“60% whole proposed pipeline. These are rough feature estimates, not production readiness.
 
 ## Environment / commands
 
@@ -69,15 +69,15 @@ Default DB `data/lineguard.db` SQLite, SQLAlchemy normalised parts/telemetry/ris
 
 ## Datasets and splits
 
-- `casting_512x512.zip`: 1,300 casting impeller images, `ok_front` 519 and `def_front` 781, 512×512, no masks/boxes/process logs. Extracted `data/raw/casting_512x512`. Prior exact-hash audit found no duplicates. Deterministic normal-only training and held-out validation/test are complete, with hashes recorded in data/processed/casting/manifest.json. Do not train memory bank on defective/validation/test images.
-- `NEU-DET.zip`: 1,800 200×200 steel-surface images with XML boxes, original labels `crazing`, `inclusion`, `patches`, `pitted_surface`, `rolled-in_scale`, `scratches`. `scripts/prepare_neu.py` corrected XML filename pairing and valid boxes, groups one exact duplicate within a split. Seed42, 1260 train / 270 val / 270 test. `data/processed/neu-det/dataset.yaml` and `manifest.json`. No polygon masks invented.
+- `casting_512x512.zip`: 1,300 casting impeller images, `ok_front` 519 and `def_front` 781, 512Ã—512, no masks/boxes/process logs. Extracted `data/raw/casting_512x512`. Prior exact-hash audit found no duplicates. Deterministic normal-only training and held-out validation/test are complete, with hashes recorded in data/processed/casting/manifest.json. Do not train memory bank on defective/validation/test images.
+- `NEU-DET.zip`: 1,800 200Ã—200 steel-surface images with XML boxes, original labels `crazing`, `inclusion`, `patches`, `pitted_surface`, `rolled-in_scale`, `scratches`. `scripts/prepare_neu.py` corrected XML filename pairing and valid boxes, groups one exact duplicate within a split. Seed42, 1260 train / 270 val / 270 test. `data/processed/neu-det/dataset.yaml` and `manifest.json`. No polygon masks invented.
 - Neither dataset has physical-part identity grouping; random image/hash groups cannot prove production generalisation.
 
 ## YOLO model state and honest results
 
 Baseline: `models/yolo/neu_yolo11n/weights/best.pt`, SHA256 `f61fd25e5521e9ee78580b0d4e4671af0931aeb1b08b01296ea2e42d28fd49e9`. Original test mAP50 **73.44%**, mAP50-95 **43.61%**, crazing recall **29.91%**, crazing AP50 **40.52%**. Details `docs/NEU_BASELINE.md` and run `evaluation.json`.
 
-**Active**: `models/yolo/neu_yolo11n_rebalanced/weights/best.pt`, SHA256 `1ee2e1428f35009ff097b8167085b76bc32d54adf6067c206eb7fa86caa537f8`, registered by `models/yolo/active.json`. Twelve-epoch rebalanced fine-tune, original training crazing images sampled three times (1,680 samples / 1,260 unique), mosaic off. Selection declared before training: validation overall mAP50-95 AND crazing AP50 must exceed baseline. Validation crazing recall **30.28 → 35.75%**, AP50 **45.46 → 48.05%**, overall mAP50-95 **43.05 → 43.15%** (tiny gain). Conservative 16-epoch candidate `neu_yolo11n_finetuned` rejected because crazing AP50 worsened.
+**Active**: `models/yolo/neu_yolo11n_rebalanced/weights/best.pt`, SHA256 `1ee2e1428f35009ff097b8167085b76bc32d54adf6067c206eb7fa86caa537f8`, registered by `models/yolo/active.json`. Twelve-epoch rebalanced fine-tune, original training crazing images sampled three times (1,680 samples / 1,260 unique), mosaic off. Selection declared before training: validation overall mAP50-95 AND crazing AP50 must exceed baseline. Validation crazing recall **30.28 â†’ 35.75%**, AP50 **45.46 â†’ 48.05%**, overall mAP50-95 **43.05 â†’ 43.15%** (tiny gain). Conservative 16-epoch candidate `neu_yolo11n_finetuned` rejected because crazing AP50 worsened.
 
 User then requested testing. New active test comparison: mAP50 **72.37%**, mAP50-95 **42.43%**, crazing recall **28.04%**, crazing AP50 **34.60%**. **Worse than baseline on this comparison**, already reported candidly. Keep validation selection separate from test reporting; do not silently select/tune on these test results. Test was previously seen for baseline reporting, so this is not a fresh blind holdout. No claim that validation improvement generalised.
 
@@ -89,14 +89,14 @@ Reports:
 - `data/model_api_test_rebalanced/examples.jpg`: first sorted test image per class, green GT/red predictions, no cherry-picking
 - Baseline API reports preserved in `data/model_api_test`; fine-tune docs `docs/FINE_TUNING.md`
 
-**Major quality-gate limitation:** current thresholds Laplacian variance≥120 and gray≥250 fraction≤8% reject **122/270** legitimate NEU test patches; only148 reach inference. Thresholds were NOT changed to optimise test scores. API metrics on accepted frames are conditional and not overall mAP. Need calibration from independent training/capture data, not test feedback.
+**Major quality-gate limitation:** current thresholds Laplacian varianceâ‰¥120 and grayâ‰¥250 fractionâ‰¤8% reject **122/270** legitimate NEU test patches; only148 reach inference. Thresholds were NOT changed to optimise test scores. API metrics on accepted frames are conditional and not overall mAP. Need calibration from independent training/capture data, not test feedback.
 
 Completed rebalanced live API run:148 persisted inference results, conditional boxprecision62.39% / recall59.82%, median warm HTTPinference53.5ms/p9569.9ms excluding upload/quality. Details `docs/YOLO_RETEST.md`. This is a functional benchmark, not a manufacturing performance claim.
 
 ## Trained analytics and safety contracts
 
 - `analytics/service.py` composes XGBoost + PLSR. Artifact hashes (including RCA metadata) pinned when creating inspections. Deferred worker refuses changed models; legacy `demo-heuristic-v1` inspections retain explicitly labelled heuristics. Missing trained artifacts at creation use explicit demo fallback; broken configured models fail closed.
-- XGBoost `models/xgboost/{model.ubj,metadata.json,synthetic_history.npz}`, `scripts/train_xgboost.py`. 500 synthetic lots ×12 parts; chronological whole-lot train0–399/test400–499. Synthetic test accuracy97%, macroF1 .9693. This is synthetic scenario recognition, not manufacturing accuracy. TreeSHAP values signed raw class margins, NOT percentages. Probabilities uncalibrated and no causal confidence.
+- XGBoost `models/xgboost/{model.ubj,metadata.json,synthetic_history.npz}`, `scripts/train_xgboost.py`. 500 synthetic lots Ã—12 parts; chronological whole-lot train0â€“399/test400â€“499. Synthetic test accuracy97%, macroF1 .9693. This is synthetic scenario recognition, not manufacturing accuracy. TreeSHAP values signed raw class margins, NOT percentages. Probabilities uncalibrated and no causal confidence.
 - PLSR `models/plsr/forecast.joblib`, PCR `models/pcr/forecast.joblib`, `scripts/train_forecast.py`. Chronological 60/20/20 split, 1078 train/360 residual-calibration/360test, preprocessing fitted only train. Synthetic test MAE PLSR6.36 percentage points, PCR7.29, persistence7.04. Predicts defect fraction, not calibrated event probability. Without two previous lots, current telemetry fills history and assumption is labelled.
 - Monte Carlo independently resamples held-out synthetic calibration residuals conditional on fixed input, clips to[0,1], 10k seeded simulations. Simulated predictive interval, not confidence interval; excludes parameter/input uncertainty.
 - `actions/sop_engine.py` v2: critical means lot quarantine independently of confidence/cause; class-specific inspection/calibration; nominal/unknown with defect means manual investigation. Forecast supports synthetic sampling review only; no PLC.
@@ -197,7 +197,7 @@ Neon PostgreSQL is read from ignored root `.env` via `DATABASE_URL`; 12 tables b
 
 Severity proxy rules v2 use class plus normalized detection-box area/side fraction for known NEU classes. PatchCore remains `anomaly_unclassified` -> `review_required`; distance scores are not probabilities and do not set severity. Triage thresholds are provisional, image-relative, and not production-calibrated. MPDD metal_plate test recall remains 38.03% (44/71 defect images missed) despite AUROC 1.0; threshold is selected on held-out normals for low false alarms, not tuned on test defects. Do not claim precision/safety for brake discs.
 
-Optional Supermemory module searches prior approved-action notes for assistant context and stores only engineer-approved action summaries (no source images). It is disabled until `SUPERMEMORY_API_KEY` is supplied in ignored `.env`. NVIDIA auto summary uses evidence citations and marks historical notes as non-evidence. ElevenLabs speech is configured. AR is still not implemented: current Three.js rotor is replay-only and not registered to a physical object; real overlay needs disc-specific images, physical scale/geometry and camera-to-part registration/marker calibration.
+Optional Supermemory module searches prior approved-action notes for assistant context and stores only engineer-approved action summaries (no source images). It is enabled from the ignored local `.env`; authenticated read-only search returned HTTP 200. No test memory was written. The API key was pasted in chat; rotate it after the demo. NVIDIA auto summary uses evidence citations and marks historical notes as non-evidence. ElevenLabs speech is configured. AR is still not implemented: current Three.js rotor is replay-only and not registered to a physical object; real overlay needs disc-specific images, physical scale/geometry and camera-to-part registration/marker calibration.
 
 Validation completed: `python -m compileall -q analytics core database apps/api vision`; Next.js production build / TypeScript; live API health (`database=postgresql`), sensor catalog, MPDD catalog, dashboard HTTP 200 and image-first UI text. No sensor rows or sample inspections were inserted. App services running on localhost:3000 and localhost:8000. Current source commits pushed as the configured project owner: `48e7407` (history/severity/assistant) and `ece63d8` (image-first UI); subsequent shape-hint copy edits need a commit/push.
 
@@ -208,3 +208,4 @@ Dataset leads to review/send:
 - MVTec AD is a general anomaly benchmark (>5k images, 15 categories, pixel masks); not brake-specific and non-commercial license.
 
 Next: ingest licensed brake-disc data when user sends it; make a labeled split grouped by physical disc/lot; train/evaluate disc-specific model and sensitivity-focused operating point without tuning on test; implement domain routing only after measured data; then register validated 2D/3D findings to camera for AR. User said mixed part types, so don't silently treat geometric roundness as definitive material/part classification.
+

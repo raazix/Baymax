@@ -22,7 +22,7 @@ async def search_precedents(inspection: dict):
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(8, connect=3), follow_redirects=False) as client:
             response = await client.post(BASE_URL + '/v4/search', headers=headers,
-                json={'query': query, 'containerTags': [CONTAINER], 'searchMode': 'hybrid', 'limit': 3})
+                json={'q': query, 'containerTags': [CONTAINER], 'searchMode': 'hybrid', 'limit': 3})
             response.raise_for_status()
             results = response.json().get('results', [])
             return [{'content': str(r.get('content', ''))[:900], 'score': r.get('score'),
