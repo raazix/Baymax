@@ -15,9 +15,10 @@ function loadOpenCv(): Promise<Cv> {
 
   openCvLoading = new Promise<Cv>((resolve, reject) => {
     let settled = false;
+    let awaitingModule = false;
     let poll = 0;
     const scriptId = 'lineguard-opencv-runtime';
-    const finish = (error?: Error) => {
+    const finish = (error?: Error, runtime?: Cv) => {
       if (settled) return;
       settled = true;
       window.clearInterval(poll);
@@ -25,11 +26,19 @@ function loadOpenCv(): Promise<Cv> {
       document.removeEventListener('error', onError, true);
       if (error) document.getElementById(scriptId)?.remove();
       if (error) reject(error);
-      else resolve((window as any).cv);
+      else resolve(runtime ?? (window as any).cv);
     };
     const check = () => {
       const candidate = (window as any).cv;
-      if (candidate?.Mat) finish();
+      if (candidate?.Mat) finish(undefined, candidate);
+      else if (candidate && typeof candidate.then === 'function' && !awaitingModule) {
+        awaitingModule = true;
+        Promise.resolve(candidate).then(runtime => {
+          if (!runtime?.Mat) { finish(new Error('OpenCV resolved without its Mat API.')); return; }
+          (window as any).cv = runtime;
+          finish(undefined, runtime);
+        }, error => finish(new Error(`OpenCV WebAssembly initialization failed: ${String(error)}`)));
+      }
     };
     const timeout = window.setTimeout(() => {
       const candidate = (window as any).cv;
@@ -93,8 +102,11 @@ export default function MarkerARViewer({ heatmap, onClose }: { heatmap: RotorHea
         if (!alive) { stream.getTracks().forEach(track => track.stop()); return; }
         video.srcObject = stream;
         await video.play();
+        if (!alive) return;
+        video.width = video.videoWidth;
+        video.height = video.videoHeight;
         capture = new cv.VideoCapture(video);
-        frameImage = new cv.Mat(); gray = new cv.Mat(); blurred = new cv.Mat(); edges = new cv.Mat();
+        frameImage = new cv.Mat(video.height, video.width, cv.CV_8UC4); gray = new cv.Mat(); blurred = new cv.Mat(); edges = new cv.Mat();
         hierarchy = new cv.Mat(); contours = new cv.MatVector();
         setStatus('Show the full bottle upright against a plain background. Keep the camera steady.');
 

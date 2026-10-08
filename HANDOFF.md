@@ -232,6 +232,8 @@ The bottle contour is only a 2D screen-space estimate, not bottle recognition, 6
 
 ### AR blank-screen fix
 
+Latest bottle OpenCV startup correction: `@techstark/opencv-js` 5 exports a Promise, including as the browser global `window.cv`. Await that Promise before checking/using `Mat`; polling `window.cv.Mat` alone causes a false initialization timeout. The loader now resolves the runtime Promise and reports actual rejection errors. `VideoCapture.read` also needs a preallocated `CV_8UC4` Mat matching explicit video width/height; fixed both. Runtime Promise resolution and grayscale conversion were exercised locally; production build/TypeScript pass. Physical webcam tracking still requires device testing.
+
 User reported nothing appeared in the live AR view. Root cause: AR.js appends its webcam video directly to `document.body` at z-index 1000 while the dashboard AR modal was at z-index 999, covering the renderer and controls. Raised the modal stacking level above the video and gated tracker updates until `ArToolkitContext.init` completes, preventing update calls before calibration/controller initialization. Production build passes; local camera and marker-lock behavior still need a browser/device check after refresh.
 
 
