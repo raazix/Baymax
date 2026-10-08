@@ -16,7 +16,7 @@ export type UploadedInspection = {
   defects: Defect[];
   quality: { passed: boolean; rejection_reasons?: string[]; profile_note?: string };
   calibration?: { mm_per_px?: number | null; source?: string; part_outline?: string };
-  context?: { model: 'neu' | 'casting'; patchcore_model?: string | null; anomaly?: Anomaly | null; geometry?: Geometry | null };
+  context?: { model: 'neu' | 'casting'; patchcore_model?: string | null; anomaly?: Anomaly | null; geometry?: Geometry | null; part_shape_hint?: string; routing_note?: string };
 };
 
 const human = (value: string) => value.replaceAll('_', ' ');
@@ -63,6 +63,7 @@ export default function UploadedPanel({ inspection }: { inspection: UploadedInsp
 
   return <>
     <div className="panel-heading"><h2>Component inspection</h2><span>{casting ? 'PatchCore' : 'YOLO11n'}</span></div>
+    <p className="muted">Shape hint: {context?.part_shape_hint === 'disc_like_round_outline' ? 'round-disc-like outline' : 'flat surface or unresolved outline'} ? geometric cue only</p>
     <InspectionImage src={inspection.image_url} defects={defects} anomaly={anomaly} geometry={geometry} markers={markers} alt={top ? `Uploaded image with ${defects.length} model finding${defects.length === 1 ? '' : 's'}` : 'Uploaded image with no model findings'} />
     <div className={`finding${anomaly?.flagged || top ? ' flagged' : ''}`}><h3>{heading}</h3>{top && <span className={`status ${top.severity.level}`}>{human(top.severity.level)}</span>}</div><p className="muted">Proxy result / not brake-disc validated</p><details className="evidence-disclosure"><summary>Measurement & model details</summary><p>{explanation}</p><p className="muted">{modelName}</p>
     {quality.passed && (top || anomaly) && <dl className="measurements">
@@ -77,10 +78,6 @@ export default function UploadedPanel({ inspection }: { inspection: UploadedInsp
       {size && <div><dt>{casting ? 'Anomalous region' : 'Largest finding'}</dt><dd>{size}{!scaled && <span className="dd-sub">no scale entered</span>}</dd></div>}
       {top && <div><dt>Radial position</dt><dd>{position ?? 'Not measured'}<span className="dd-sub">{position ? `zone: ${top.zone}` : !casting ? 'flat surface patch, no centre' : geometry ? 'no finding centre' : 'part outline not located'}</span></dd></div>}
     </dl>}
-    <p className="footnote">
-      {geometry ? 'The dashed outline is the part edge fitted from the image; R is the distance from the centre to that edge, 0° points right and angles run counter-clockwise. ' : casting ? 'The part outline could not be located reliably in this image, so no radial position is given. ' : ''}
-      {scaled ? `Millimetres use ${calibration?.source}. ` : 'Enter the part’s real diameter above the image to convert pixels to millimetres. '}
-      Proxy model, not brake-disc validated; severity comes from fixed rules on defect class, never model confidence.{quality.profile_note ? ` ${quality.profile_note}` : ''}
-    </p></details>
+    <p className="footnote">{geometry ? 'The dashed outline is fitted from the image; radial position uses its detected centre. ' : casting ? 'The part outline was not located reliably, so no radial position is given. ' : ''}{scaled ? `Millimetres use ${calibration?.source}. ` : 'No scale supplied; lengths remain in pixels. '}{context?.routing_note || 'Proxy output is not brake-disc validated. Image-relative triage rules do not set production severity.'}{quality.profile_note ? ` ${quality.profile_note}` : ''}</p></details>
   </>;
 }

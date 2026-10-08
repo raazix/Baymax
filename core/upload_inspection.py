@@ -105,6 +105,8 @@ def create_upload_inspection(stored: dict, shape, model: str, process_context: s
               'disposition': 'review' if defects else 'pass', 'image_url': f'/api/inspections/{identifier}/image', 'image_sha256': sha,
               'model_versions': versions,
               'context': {'model': model, 'frame_id': stored['id'], 'model_run_id': run_id, 'image_size_px': [shape[1], shape[0]], 'patchcore_model': patchcore_model if model == 'casting' else None,
+                          'part_shape_hint': 'disc_like_round_outline' if geometry else 'flat_or_unresolved_surface',
+                          'routing_note': 'A geometric outline hint only; this does not identify a brake disc. MPDD metal_plate is used as a surface proxy for either input type.',
                           'anomaly': _anomaly_evidence(run) if model == 'casting' and run is not None else None,
                           'geometry': geometry,
                           'inference': run.get('inference') if run else None,
