@@ -209,3 +209,9 @@ Dataset leads to review/send:
 
 Next: ingest licensed brake-disc data when user sends it; make a labeled split grouped by physical disc/lot; train/evaluate disc-specific model and sensitivity-focused operating point without tuning on test; implement domain routing only after measured data; then register validated 2D/3D findings to camera for AR. User said mixed part types, so don't silently treat geometric roundness as definitive material/part classification.
 
+
+## 2026-10-09 thermal brake-disc dataset inspection
+
+User added root `dataset.zip` (268,325,348 bytes). ZIP CRC check passes. Archive has `dataset/images/` and `dataset/masks/`, 27,700 files each (55,400 files; about 289.5 MB uncompressed). All 27,700 image/mask filename stems match one-to-one; image files include 1,764 original-looking PNGs and 25,936 JPEG augmentation variants. There are 998 numeric source-ID groups (001–999, with missing IDs); keep every variant under the same numeric ID in one split to prevent leakage. No train/validation/test folders, class metadata, or README are included. Samples are 256x256 RGB images with grayscale masks; sampled masks use values 0/1, so a loader must threshold `> 0` or rescale masks for visualization.
+
+The Mendeley listing describes raw thermal brake-disc frames at 160x120 and three fissure classes (penetrating, incipient, superficial), while this local archive is 256x256 and exposes only binary masks. Treat it as a processed/augmented fissure-segmentation set; do not infer the three subclasses from filenames. It can support a separate thermal fissure segmentation model (e.g. U-Net), but it is not a YOLO class dataset and is unrelated to the RGB MPDD metal-plate PatchCore bank. No training or active pipeline change was made. Need source/class mapping or original data before reporting class-specific severity; split by numeric ID and preferably use the base captures with on-the-fly augmentation.
