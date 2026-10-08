@@ -13,7 +13,9 @@ The view uses OpenCV.js to find a tall centered contour, then submits a lossless
 
 The PNG crop is hashed locally. Stored-frame and inference hashes, frame ID and model name must match before rendering. The grid is drawn at the crop's original coordinates with the source frame's camera-cover transform. Only above-threshold patches are colored. Quality failures prevent model inference. Failures clear the heatmap; closing or switching models aborts requests and ignores late results.
 
-The view displays the **exact analyzed snapshot**, its crop outline, capture time, score, threshold and image hash prefix. It holds that snapshot until the next result. This is sampled camera analysis, not real-time 3D surface registration. A delayed result is never drawn over different moving pixels. The API stores crop images and model runs for traceability.
+The main video stays live, with only the tracked outline over it. A separate result canvas in the side panel displays the **exact analyzed snapshot**, its crop outline, capture time, score, threshold and image hash prefix. That result remains until the next capture completes. This is sampled camera analysis, not real-time 3D surface registration. A delayed result is never drawn over different moving pixels. The API stores crop images and model runs for traceability.
+
+The video requests 30 fps. OpenCV runs separately at up to 10 Hz on a frame no wider than 320 pixels, pauses while the tab is hidden, and reuses its morphology kernel. Its reduced-resolution coordinates are mapped back to the original camera pixels before cropping, so inference keeps the native capture resolution. The result canvas is painted only when a new result arrives. The full-screen outline canvas caps its pixel ratio at 1.5.
 
 ## Limits and validation
 

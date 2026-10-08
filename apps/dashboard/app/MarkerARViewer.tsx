@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { anomalyLayer, clampCrop, coverTransform, inspectBottleCrop, type BottleAnomaly } from './bottleInference';
+import { anomalyLayer, sourceCrop, coverTransform, inspectBottleCrop, type BottleAnomaly } from './bottleInference';
 
 type Box = { x: number; y: number; width: number; height: number };
 type Cv = any;
@@ -70,6 +70,7 @@ function loadOpenCv(): Promise<Cv> {
 export default function MarkerARViewer({ initialModel = 'default', onClose }: { initialModel?: string; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const resultCanvasRef = useRef<HTMLCanvasElement>(null);
   const [model, setModel] = useState(initialModel);
   const [models, setModels] = useState<string[]>([initialModel]);
   const [status, setStatus] = useState('Loading OpenCV and starting the camera...');
@@ -95,14 +96,18 @@ export default function MarkerARViewer({ initialModel = 'default', onClose }: { 
   useEffect(() => {
     let alive = true, raf = 0;
     let stream: MediaStream | null = null;
-    let cv: Cv, capture: Cv, frameImage: Cv, gray: Cv, blurred: Cv, edges: Cv, hierarchy: Cv, contours: Cv;
+    let cv: Cv, frameImage: Cv, gray: Cv, blurred: Cv, edges: Cv, hierarchy: Cv, contours: Cv, kernel: Cv;
     let smoothed: Box | null = null;
     let lostFrames = 0, inFlight = false, nextInference = 0, lastTracked = false;
-    let analyzed: { snapshot: HTMLCanvasElement; layer: HTMLCanvasElement; box: Box } | null = null;
+    let lastTracking = 0;
+    const sourceCanvas = document.createElement('canvas');
+    const trackingCanvas = document.createElement('canvas');
+    const sourceCtx = sourceCanvas.getContext('2d');
+    const trackingCtx = trackingCanvas.getContext('2d', { willReadFrequently: true });
     const controller = new AbortController();
     const video = videoRef.current, canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!video || !canvas || !ctx) return;
+    if (!video || !canvas || !ctx || !sourceCtx || !trackingCtx) return;
     setEvidence(null); setTracked(false); setBusy(false);
 
     const analyze = async (box: Box, width: number, height: number) => {
@@ -114,9 +119,12 @@ export default function MarkerARViewer({ initialModel = 'default', onClose }: { 
       let timedOut = false;
       const timeout = window.setTimeout(() => { timedOut = true; requestController.abort(); }, 45000);
       try {
-        // Copy the exact OpenCV frame used for contour detection before the next video frame arrives.
+        // Preserve the full-resolution source used to produce the small tracking frame.
         const snapshot = document.createElement('canvas');
-        cv.imshow(snapshot, frameImage);
+        snapshot.width = width; snapshot.height = height;
+        const snapshotCtx = snapshot.getContext('2d');
+        if (!snapshotCtx) throw new Error('Snapshot canvas is unavailable.');
+        snapshotCtx.drawImage(sourceCanvas, 0, 0);
         const crop = document.createElement('canvas');
         crop.width = box.width; crop.height = box.height;
         const cropCtx = crop.getContext('2d');
@@ -125,12 +133,20 @@ export default function MarkerARViewer({ initialModel = 'default', onClose }: { 
         const result = await inspectBottleCrop(crop, model, requestController.signal);
         if (!alive) return;
         if (snapshot.width !== width || snapshot.height !== height) throw new Error('Captured frame dimensions changed.');
-        analyzed = { snapshot, layer: anomalyLayer(result), box };
+        const resultCanvas = resultCanvasRef.current;
+        const resultCtx = resultCanvas?.getContext('2d');
+        if (!resultCanvas || !resultCtx) return;
+        resultCanvas.width = width; resultCanvas.height = height;
+        resultCtx.drawImage(snapshot, 0, 0);
+        resultCtx.imageSmoothingEnabled = false;
+        resultCtx.drawImage(anomalyLayer(result), box.x, box.y, box.width, box.height);
+        resultCtx.strokeStyle = '#61f0d0'; resultCtx.lineWidth = 2;
+        resultCtx.strokeRect(box.x, box.y, box.width, box.height);
         setEvidence({ result, capturedAt });
-        setStatus('Showing the exact analyzed frame. Captures refresh automatically while the bottle is visible.');
+        setStatus('Live camera is running. The heatmap capture below refreshes automatically.');
       } catch (error) {
         if (!alive) return;
-        analyzed = null; setEvidence(null);
+        setEvidence(null);
         setStatus(timedOut ? 'Camera inference timed out. Check the backend connection.' : error instanceof Error ? error.message : 'Camera inference failed.');
       } finally {
         window.clearTimeout(timeout);
@@ -144,42 +160,58 @@ export default function MarkerARViewer({ initialModel = 'default', onClose }: { 
       try {
         cv = await loadOpenCv();
         if (!alive) return;
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 960 }, height: { ideal: 720 } }, audio: false });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 960 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }, audio: false });
         if (!alive) { stream.getTracks().forEach(track => track.stop()); return; }
         video.srcObject = stream;
         await video.play();
         if (!alive) return;
         video.width = video.videoWidth; video.height = video.videoHeight;
-        capture = new cv.VideoCapture(video);
-        frameImage = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+        sourceCanvas.width = video.width; sourceCanvas.height = video.height;
+        const ratio = Math.min(1, 320 / video.width);
+        trackingCanvas.width = Math.max(1, Math.round(video.width * ratio));
+        trackingCanvas.height = Math.max(1, Math.round(video.height * ratio));
+        frameImage = new cv.Mat(trackingCanvas.height, trackingCanvas.width, cv.CV_8UC4);
         gray = new cv.Mat(); blurred = new cv.Mat(); edges = new cv.Mat();
         hierarchy = new cv.Mat(); contours = new cv.MatVector();
+        kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
         setStatus('Center the full bottle upright against a plain background. Live capture analysis starts automatically.');
 
         const render = () => {
           if (!alive) return;
           try {
+            const now = performance.now();
+            if (document.hidden || now - lastTracking < 100) { raf = requestAnimationFrame(render); return; }
+            lastTracking = now;
             const w = video.videoWidth, h = video.videoHeight;
             if (!w || !h) { raf = requestAnimationFrame(render); return; }
-            const cw = Math.round(canvas.clientWidth * devicePixelRatio), ch = Math.round(canvas.clientHeight * devicePixelRatio);
+            const pixelRatio = Math.min(devicePixelRatio, 1.5);
+            const cw = Math.round(canvas.clientWidth * pixelRatio), ch = Math.round(canvas.clientHeight * pixelRatio);
             if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
             ctx.clearRect(0, 0, cw, ch);
-            capture.read(frameImage);
+            if (sourceCanvas.width !== w || sourceCanvas.height !== h) { sourceCanvas.width = w; sourceCanvas.height = h; }
+            sourceCtx.drawImage(video, 0, 0, w, h);
+            const targetWidth = Math.min(320, w), targetHeight = Math.max(1, Math.round(h * targetWidth / w));
+            if (trackingCanvas.width !== targetWidth || trackingCanvas.height !== targetHeight) {
+              trackingCanvas.width = targetWidth; trackingCanvas.height = targetHeight;
+              frameImage.delete(); frameImage = new cv.Mat(targetHeight, targetWidth, cv.CV_8UC4);
+            }
+            const tw = trackingCanvas.width, th = trackingCanvas.height;
+            trackingCtx.drawImage(sourceCanvas, 0, 0, tw, th);
+            frameImage.data.set(trackingCtx.getImageData(0, 0, tw, th).data);
             cv.cvtColor(frameImage, gray, cv.COLOR_RGBA2GRAY);
             cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
             cv.Canny(blurred, edges, 45, 125);
-            const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7));
-            try { cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel); } finally { kernel.delete(); }
+            cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel);
             cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
             let best: Box | null = null, bestScore = 0;
             for (let i = 0; i < contours.size(); i++) {
               const contour = contours.get(i);
               try {
                 const area = cv.contourArea(contour), rect = cv.boundingRect(contour);
-                const aspect = rect.width / Math.max(rect.height, 1), centerX = (rect.x + rect.width / 2) / w;
-                if (area < w * h * 0.012 || rect.height < h * 0.24 || aspect < 0.12 || aspect > 1.05 || centerX < 0.12 || centerX > 0.88) continue;
+                const aspect = rect.width / Math.max(rect.height, 1), centerX = (rect.x + rect.width / 2) / tw;
+                if (area < tw * th * 0.012 || rect.height < th * 0.24 || aspect < 0.12 || aspect > 1.05 || centerX < 0.12 || centerX > 0.88) continue;
                 const score = area * (1 - Math.abs(centerX - 0.5));
-                if (score > bestScore) { bestScore = score; best = clampCrop(rect, w, h); }
+                if (score > bestScore) { bestScore = score; best = sourceCrop(rect, tw, th, w, h); }
               } finally { contour.delete(); }
             }
             if (best) {
@@ -189,29 +221,22 @@ export default function MarkerARViewer({ initialModel = 'default', onClose }: { 
                 width: smoothed.width * 0.65 + best.width * 0.35, height: smoothed.height * 0.65 + best.height * 0.35,
               } : best;
               if (!inFlight && performance.now() >= nextInference) void analyze(best, w, h);
-            } else if (++lostFrames > 8) { smoothed = null; }
+            } else if (++lostFrames > 4) { smoothed = null; }
             const isTracked = smoothed !== null;
             if (isTracked !== lastTracked) { lastTracked = isTracked; setTracked(isTracked); }
 
             const transform = coverTransform(w, h, cw, ch);
             const { scale, x: ox, y: oy } = transform;
-            // A delayed model result is always paired with its captured pixels, never the moving live video.
-            if (analyzed) {
-              ctx.drawImage(analyzed.snapshot, ox, oy, w * scale, h * scale);
-              const box = analyzed.box;
-              ctx.save(); ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(analyzed.layer, ox + box.x * scale, oy + box.y * scale, box.width * scale, box.height * scale);
-              ctx.restore();
-            }
-            const outline = analyzed?.box ?? smoothed;
+            // The full-screen canvas holds only a lightweight outline; native video stays live.
+            const outline = smoothed;
             if (outline) {
-              ctx.strokeStyle = '#61f0d0'; ctx.lineWidth = 2 * devicePixelRatio;
+              ctx.strokeStyle = '#61f0d0'; ctx.lineWidth = 2 * pixelRatio;
               ctx.strokeRect(ox + outline.x * scale, oy + outline.y * scale, outline.width * scale, outline.height * scale);
             }
             raf = requestAnimationFrame(render);
           } catch (error) {
             controller.abort();
-            analyzed = null; ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             setEvidence(null); setStatus(`Camera tracking stopped: ${error instanceof Error ? error.message : String(error)}`);
           }
         };
@@ -224,20 +249,21 @@ export default function MarkerARViewer({ initialModel = 'default', onClose }: { 
     return () => {
       alive = false; cancelAnimationFrame(raf); controller.abort();
       stream?.getTracks().forEach(track => track.stop());
-      for (const item of [capture, frameImage, gray, blurred, edges, hierarchy, contours]) item?.delete?.();
+      for (const item of [frameImage, gray, blurred, edges, hierarchy, contours, kernel]) item?.delete?.();
     };
   }, [model]);
 
   return <div className="marker-ar bottle-ar" role="dialog" aria-modal="true" aria-label="Bottle camera analysis">
     <video ref={videoRef} className="bottle-ar-video" playsInline muted />
     <canvas ref={canvasRef} className="bottle-ar-canvas" />
-    <header className="marker-ar-head"><div><strong>LINEGUARD / CAMERA ANALYSIS</strong><span className={tracked ? 'tracking-live' : ''}>{evidence ? 'ANALYZED FRAME' : tracked ? 'BOTTLE IN VIEW' : 'SEARCHING FOR BOTTLE'}</span></div><button className="icon-button" aria-label="Close camera analysis" onClick={onClose}><X size={18} /></button></header>
+    <header className="marker-ar-head"><div><strong>LINEGUARD / LIVE CAMERA</strong><span className={tracked ? 'tracking-live' : ''}>{tracked ? 'BOTTLE IN VIEW' : 'SEARCHING FOR BOTTLE'}</span></div><button className="icon-button" aria-label="Close camera analysis" onClick={onClose}><X size={18} /></button></header>
     <aside className="marker-ar-panel"><h2>Camera heatmap</h2>
       <label>Experimental model <select value={model} onChange={event => setModel(event.target.value)}>{models.map(name => <option value={name} key={name}>{name.replaceAll('_', ' ')}</option>)}</select></label>
       <p role="status">{busy ? 'Analyzing a new camera crop... ' : ''}{status}</p>
+      <canvas ref={resultCanvasRef} className="bottle-result-canvas" hidden={!evidence} aria-label="Heatmap on the exact analyzed camera capture" />
       {evidence && <p>Captured {new Date(evidence.capturedAt).toLocaleTimeString()}<br />Crop score {evidence.result.anomaly_score.toFixed(3)} / threshold {evidence.result.threshold.toFixed(3)}<br />Image {evidence.result.image_sha256.slice(0, 12)}</p>}
-      {evidence && !tracked && <p>Bottle out of live view; showing the last analyzed frame.</p>}
-      <p className="marker-ar-caution">Colors come from this camera crop. Only patches above the model threshold are colored. The view holds the analyzed frame until the next result arrives. PatchCore grids are coarse; reflections and background may trigger scores. Accuracy on your steel bottle is unvalidated.</p>
+      {evidence && !tracked && <p>Bottle out of live view; the result panel retains the last analyzed capture.</p>}
+      <p className="marker-ar-caution">The main camera stays live. The result panel pairs each heatmap with its analyzed capture. Only above-threshold patches are colored. Accuracy on your steel bottle is unvalidated.</p>
     </aside>
   </div>;
 }

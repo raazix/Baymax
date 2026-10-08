@@ -17,6 +17,11 @@ export function coverTransform(width: number, height: number, viewportWidth: num
   return { scale, x: (viewportWidth - width * scale) / 2, y: (viewportHeight - height * scale) / 2 };
 }
 
+export function sourceCrop(box: PixelBox, trackingWidth: number, trackingHeight: number, sourceWidth: number, sourceHeight: number): PixelBox {
+  return clampCrop({ x: box.x * sourceWidth / trackingWidth, y: box.y * sourceHeight / trackingHeight,
+    width: box.width * sourceWidth / trackingWidth, height: box.height * sourceHeight / trackingHeight }, sourceWidth, sourceHeight);
+}
+
 export function validateAnomaly(result: BottleAnomaly, imageHash: string) {
   if (result.image_sha256 !== imageHash) throw new Error('Heatmap image hash does not match the captured crop.');
   const columns = result.anomaly_grid?.[0]?.length;

@@ -26,7 +26,7 @@ const context = { exports: exportsObject, crypto: webcrypto, Blob, Uint8Array, A
   },
 };
 vm.runInNewContext(js, context);
-const { clampCrop, coverTransform, validateAnomaly, anomalyLayer, inspectBottleCrop } = exportsObject;
+const { clampCrop, sourceCrop, coverTransform, validateAnomaly, anomalyLayer, inspectBottleCrop } = exportsObject;
 
 async function main() {
   assert.equal(JSON.stringify(clampCrop({ x: -2, y: 8.4, width: 15, height: 20 }, 10, 12)),
@@ -35,6 +35,8 @@ async function main() {
   assert.equal(transform.scale, 1.25);
   assert.equal(transform.x, -250); assert.equal(transform.y, 0);
   assert.equal(200 * transform.scale + transform.x, 0); // Source crop x maps through the same cover crop as video.
+  assert.equal(JSON.stringify(sourceCrop({ x: 50, y: 20, width: 75, height: 180 }, 320, 240, 960, 720)),
+    JSON.stringify({ x: 150, y: 60, width: 225, height: 540 })); // Small-frame tracking preserves native inference pixels.
   assert.throws(() => validateAnomaly(result, 'wrong-frame'), /does not match/);
   assert.throws(() => validateAnomaly({ ...result, anomaly_grid: [[1], [2, 3]] }, hash), /invalid/);
   assert.throws(() => validateAnomaly({ ...result, anomaly_grid: [[NaN]] }, hash), /invalid/);
