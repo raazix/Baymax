@@ -151,15 +151,17 @@ def frame_image(identifier: str):
     return Response(frame['content'], media_type=frame['media_type'], headers={'ETag': '"'+frame['sha256']+'"', 'X-Content-Type-Options': 'nosniff'})
 
 @app.post('/api/proxy/frames/{identifier}/detect')
-def proxy_inference(identifier: str):
+def proxy_inference(identifier: str, inference_mode: Literal['full', 'sliced'] = Query('full'),
+                    tile_size: int = Query(512, ge=128, le=2048), overlap: float = Query(.2, ge=0, le=.5)):
     stored = repo.get_frame(identifier)
     if stored is None: raise HTTPException(404, 'Frame not found')
     if not stored['quality']['passed']: raise HTTPException(422, 'Quality gate failed; recapture before inference')
     if stored['quality'].get('profile', 'camera') not in ('camera', 'neu_proxy'):
         raise HTTPException(422, 'Quality calibration profile does not match the NEU model')
     frame, _ = decode(stored['content'])
-    try: result = proxy_detector.detect(frame)
+    try: result = proxy_detector.detect(frame) if inference_mode == 'full' else proxy_detector.detect(frame, inference_mode, tile_size, overlap)
     except ModelUnavailable as error: raise HTTPException(503, str(error))
+    except ValueError as error: raise HTTPException(422, str(error))
     payload = result | {'id': str(uuid4()), 'created_at': utc_now(), 'frame_id': identifier,
                         'image_sha256': stored['sha256'], 'quality': stored['quality']}
     repo.save_model_run(payload)
@@ -303,10 +305,14 @@ def retry_job(identifier: str):
 async def upload_inspection(request: Request, model: Literal['neu', 'casting'] = Query('casting'),
                             process_context: Literal['nominal', 'thermal_drift'] = Query('nominal'),
                             patchcore_model: str = Query('default'),
+                            inference_mode: Literal['full', 'sliced'] = Query('full'),
+                            tile_size: int = Query(512, ge=128, le=2048), overlap: float = Query(.2, ge=0, le=.5),
                             part_diameter_mm: float | None = Query(None, gt=0, le=5000),
                             mm_per_px: float | None = Query(None, gt=0, le=100),
                             lot_id: str = Query('LOT-UPLOAD', min_length=1, max_length=40, pattern=r'^[A-Za-z0-9._-]+$'),
                             machine_id: str = Query('M-UPLOAD', min_length=1, max_length=40, pattern=r'^[A-Za-z0-9._-]+$')):
+    if model != 'neu' and inference_mode == 'sliced':
+        raise HTTPException(422, 'SAHI sliced inference is available only for the NEU YOLO model')
     content, frame, media, quality = await uploaded_frame(request, PROFILES[model])
     stored = {'id': str(uuid4()), 'created_at': utc_now(), 'sha256': hashlib.sha256(content).hexdigest(),
               'media_type': media, 'content': content, 'quality': quality}
@@ -314,7 +320,10 @@ async def upload_inspection(request: Request, model: Literal['neu', 'casting'] =
     run = run_id = None
     if quality['passed']:
         try:
-            run = await run_in_threadpool(proxy_detector.detect if model == 'neu' else patchcore_for(patchcore_model).detect, frame)
+            if model == 'neu' and inference_mode == 'sliced':
+                run = await run_in_threadpool(proxy_detector.detect, frame, inference_mode, tile_size, overlap)
+            else:
+                run = await run_in_threadpool(proxy_detector.detect if model == 'neu' else patchcore_for(patchcore_model).detect, frame)
         except (ModelUnavailable, PatchCoreUnavailable) as error: raise HTTPException(503, str(error))
         except ValueError as error: raise HTTPException(422, str(error))
         run_id = str(uuid4())

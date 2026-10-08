@@ -103,6 +103,7 @@ def create_upload_inspection(stored: dict, shape, model: str, process_context: s
               'context': {'model': model, 'frame_id': stored['id'], 'model_run_id': run_id, 'image_size_px': [shape[1], shape[0]], 'patchcore_model': patchcore_model if model == 'casting' else None,
                           'anomaly': _anomaly_evidence(run) if model == 'casting' and run is not None else None,
                           'geometry': geometry,
+                          'inference': run.get('inference') if run else None,
                           'process_context': process_context,
                           'telemetry_source': 'Simulated preset chosen by the operator; NOT measured from the image.'},
               'audit': [{'at': now, 'event': 'inspection_created', 'actor': 'upload', 'source': 'uploaded_image', 'frame_id': stored['id']}]}
