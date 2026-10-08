@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
+import httpx
 import cv2
 import numpy as np
 from fastapi.testclient import TestClient
@@ -63,6 +64,19 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(response.json()['quality']['profile'], 'casting_proxy')
         invalid = self.client.post('/api/inspections/upload?input_source=invalid', content=image.tobytes(), headers={'Content-Type': 'image/png'})
         self.assertEqual(invalid.status_code, 422)
+
+    def test_critical_alert_endpoint_returns_elevenlabs_audio_and_blocks_normal(self):
+        critical = self.replay(scenario='thermal_drift')
+        audio = httpx.Response(200, content=b'ID3alert', headers={'content-type': 'audio/mpeg'})
+        with patch.dict(os.environ, {'ELEVENLABS_API_KEY': 'test-only'}), patch.object(main.assistant, 'provider_post', AsyncMock(return_value=audio)) as provider:
+            response = self.client.post(f"/api/inspections/{critical['id']}/alert-speech")
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.content, b'ID3alert')
+            self.assertIn('audio/mpeg', response.headers['content-type'])
+            self.assertIn('Critical quality alert', provider.call_args.kwargs['json']['text'])
+            normal = self.replay(scenario='normal')
+            self.assertEqual(self.client.post(f"/api/inspections/{normal['id']}/alert-speech").status_code, 409)
+            self.assertEqual(provider.call_count, 1)
 
     def test_durable_deferred_job_and_projections(self):
         record = self.replay(analytics_mode='deferred')

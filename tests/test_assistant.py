@@ -61,6 +61,31 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(assistant.AssistantUnavailable):
             await assistant.transcribe(b'audio', 'text/plain')
 
+    async def test_alert_speaks_stored_critical_evidence_without_llm_or_mutation(self):
+        self.inspection['source'] = 'synthetic_replay'
+        self.inspection['defects'] = [{'label': 'surface_crack', 'severity': {'level': 'critical'}}]
+        original = json.dumps(self.inspection)
+        response = httpx.Response(200, content=b'ID3alert', headers={'content-type': 'audio/mpeg'})
+        with patch.object(assistant, 'provider_post', AsyncMock(return_value=response)) as provider:
+            self.assertEqual(await assistant.alert_speech(self.inspection), b'ID3alert')
+        self.assertEqual(original, json.dumps(self.inspection))
+        self.assertIn('api.elevenlabs.io/v1/text-to-speech/', provider.call_args.args[0])
+        text = provider.call_args.kwargs['json']['text']
+        self.assertIn('Synthetic demonstration.', text)
+        self.assertIn('Critical quality alert.', text)
+        self.assertIn('surface crack', text)
+        self.assertIn('lot L1', text)
+
+    async def test_alert_rejects_normal_and_rejected_captures_before_provider(self):
+        with patch.object(assistant, 'provider_post', AsyncMock()) as provider:
+            with self.assertRaises(assistant.AssistantUnavailable):
+                await assistant.alert_speech(self.inspection)
+            self.inspection['defects'] = [{'label': 'scratch', 'severity': {'level': 'high'}}]
+            self.inspection['quality']['passed'] = False
+            with self.assertRaises(assistant.AssistantUnavailable):
+                await assistant.alert_speech(self.inspection)
+        provider.assert_not_called()
+
     async def test_provider_errors_never_echo_response_or_key(self):
         response = httpx.Response(401, json={'detail': 'secret-provider-error'})
         with patch('httpx.AsyncClient.post', AsyncMock(return_value=response)):

@@ -149,6 +149,22 @@ async def speech(record):
         raise AssistantUnavailable('ElevenLabs returned no playable audio.', 502)
     return response.content
 
+
+async def alert_speech(record):
+    """Speak stored critical/high evidence directly; no generated safety decision."""
+    findings = [d for d in record.get('defects', [])
+                if d.get('severity', {}).get('level') in ('critical', 'high')]
+    if not record.get('quality', {}).get('passed') or not findings:
+        raise AssistantUnavailable('No critical or high finding in this inspection.', 409)
+    critical = any(d['severity']['level'] == 'critical' for d in findings)
+    scope = ('Synthetic demonstration. ' if record.get('source') == 'synthetic_replay'
+             else 'Proxy model inspection. ')
+    text = scope + ('Critical quality alert. ' if critical else 'High severity quality alert. ')
+    text += 'Part ' + str(record['part_id'])[:100] + ', lot ' + str(record['lot_id'])[:100] + '. '
+    text += ', '.join(str(d['label']).replace('_', ' ')[:80] for d in findings[:4]) + '. '
+    text += 'Engineer review required. ' + str(record.get('action', {}).get('text', ''))[:700]
+    return await speech({'answer': text})
+
 async def transcribe(content, media_type):
     extensions = {'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/mpeg': 'mp3'}
     if media_type not in extensions:

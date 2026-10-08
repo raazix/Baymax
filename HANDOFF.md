@@ -4,6 +4,18 @@ Last updated: 2026-10-08T19:50:35+05:30. Workspace: `D:aymax`, PowerShell, Wind
 
 ## User intent and constraints
 
+### Latest checkpoint: Track 3 audit and production lifecycle (2026-10-09)
+
+Read `docs/TRACK3.md` first for the current requirements audit. The PPT slides 15-19 were reread. Main gaps: no validated brake-disc defect classes/severity; simulated process presets are not joined to imported history; forecasts are synthetic expected defect fractions, not calibrated machine-event probabilities; dedicated grouped affected-batch alerts are missing. RCA confidence is now visible with its uncalibrated label. Historical feature estimates below are not a judging score or current readiness measure.
+
+Added `ProductionLine.tsx`: Three.js procedural lifecycle with casting, machining, inspection, engineer review and dispatch. Inspection critical severity latches a simulated hold, visual notification and ElevenLabs alert. Approval alone does not resume; explicit resume required. Observed critical records queue behind the current hold, normal images do not clear it. Includes explicit synthetic critical replay button. Unknown PatchCore anomalies remain review-required, not automatically critical. No physical machine/PLC commands.
+
+Fixed a real bug: `/alert-speech` called a missing `assistant.alert_speech`. It now speaks stored high/critical evidence with proxy/synthetic labels, rejects normal/rejected captures, and never uses an LLM to make safety decisions. Single audio player, playback-block notice, request cancellation, duplicate suppression, URL cleanup, visible provider errors. Actual ElevenLabs HTTP 200 MP3 smoke succeeded (459,381 bytes). Assistant tests 8 and backend tests 11 passed; Next.js production build passed. Browser test exercises real PostgreSQL-backed replay/approval and the WebGL hold/resume workflow. See `docs/PRODUCTION_DEMO.md` for final verification and how to run it.
+
+Next.js rewrite forwarding intermittently stalled in browser tests. Replaced with a bounded catch-all route handler with explicit request bytes, response streaming, timeouts and no automatic mutation retries. Final browser regression passed against real API; forwarding smoke checked PNG bytes/provenance, query validation and 413 limits. Current API health reports PostgreSQL. NVIDIA/ElevenLabs/Supermemory ARE integrated; earlier statements below describing them as pending are historical. Git main is connected to raazix/Baymax and uses the owner's author identity without coauthor trailers. The preview was tested on port 3001 because 3000 was already occupied. Do not rely on historical process IDs below.
+
+
+
 ### Dashboard camera scanner (2026-10-09)
 
 Added **Scan with camera** beside upload: live preview, facing-direction switch, and **Capture and inspect**. `CameraScanner.tsx` captures a native-resolution PNG, runs the existing full inspection pipeline with selected settings, opens the result in the console, and stops/aborts on close. `/api/inspections/upload` now accepts `input_source=upload|camera` (upload default); camera uses camera quality profile and saves input_source context plus camera_scan audit actor. File-upload profile behavior is preserved. Camera results are labeled in the inspection heading, audit source and history. Backend suite: 10 tests pass, including camera quality rejection/no inference, persisted provenance/image, upload defaults and invalid source. Actual local camera-source API test on a sample PNG passed full analytics/action output and matching saved image/hash. Local API was restarted to load the feature. See `docs/CAMERA_SCANNING.md`. Webcam permission/switching still needs physical-device testing.
@@ -21,8 +33,8 @@ The bottle camera view now runs fresh PatchCore inference on a PNG crop from the
 - Use **Next.js + TypeScript**, not Vite. Familiar industrial dashboard. Current priority: finish a strong backend before further UI work.
 - Use the local `.venv`; do not replace the installed CUDA PyTorch. User authorized downloads, training, and subagents for backend work. Do not ask again for routine authorized work.
 - Never let ML confidence decide severity; deterministic engineering demo rules do. No PLC control. Engineer approval is required before action/verification.
-- LLM/Supermemory were discussed but are optional and **not integrated**. Grounded briefing endpoint is ready; store canonical evidence in DB and do not index unverified hypotheses as verified incidents.
-- Current user requests: **test fine-tuned model, then work on PatchCore**, and keep this handoff updated with context/checkpoints for Claude.
+- NVIDIA LLM, Supermemory and ElevenLabs are integrated. Store canonical evidence in DB; memory/explanations do not turn hypotheses into verified incidents or replace engineer approval.
+- Current requests: audit all PPT Track 3 requirements; animated manufacturing lifecycle with critical stop/voice/notification; keep this handoff current for Claude.
 
 ## Architecture and implementation truth
 
@@ -37,7 +49,7 @@ Feature coverage estimates communicated: ~70% hackathon backend and ~50â€“6
 
 ## Environment / commands
 
-`.venv` was created with system site packages, but CUDA torch/torchvision/scipy/xgboost were installed locally. Torch `2.6.0+cu126`, torchvision `0.21.0+cu126`, Ultralytics `8.3.253`, XGBoost `3.4.1`. SciPy had broken global metadata; local install fixed it. Wheels cached in `data/wheels`; avoid deleting large caches without need. No git repository currently exists.
+`.venv` was created with system site packages, but CUDA torch/torchvision/scipy/xgboost were installed locally. Torch `2.6.0+cu126`, torchvision `0.21.0+cu126`, Ultralytics `8.3.253`, XGBoost `3.4.1`. SciPy had broken global metadata; local install fixed it. Wheels cached in `data/wheels`; avoid deleting large caches without need. Git repository exists; verify status and remote before updates.
 
 ```powershell
 $env:LINEGUARD_MODEL_DEVICE = '0'
@@ -52,7 +64,7 @@ npm.cmd run build
 
 API docs: `http://127.0.0.1:8000/docs`; dashboard: `http://localhost:3000` when started. At this checkpoint API PID **25636** (exec session 14315), worker exec session **81570**. Check actual command lines before stopping processes; never kill arbitrary Python processes. Dashboard dev server is not currently started. API was restarted after PatchCore integration with LINEGUARD_MODEL_DEVICE=0 (PatchCore normalizes this to cuda:0).
 
-Default DB `data/lineguard.db` SQLite, SQLAlchemy normalised parts/telemetry/risk/actions plus snapshots, frames, model runs, jobs, revisions, audit events. PostgreSQL config exists, not tested. One API process and one worker; no distributed leases. API token optional `LINEGUARD_API_TOKEN`; engineer names are asserted, not authenticated identities.
+SQLite fallback is `data/lineguard.db`; the active local API uses PostgreSQL. Storage includes SQLAlchemy normalised parts/telemetry/risk/actions plus snapshots, frames, model runs, jobs, revisions, audit events. PostgreSQL-backed replay, image persistence and approval have been exercised. One API process and one worker; no distributed leases. API token optional `LINEGUARD_API_TOKEN`; engineer names are asserted, not authenticated identities.
 
 ## Checkpoints
 
