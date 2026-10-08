@@ -1,182 +1,160 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
 import { X } from 'lucide-react';
-import { buildHeatmap, type RotorHeatmap } from './RotorViewer';
+import type { RotorHeatmap } from './RotorViewer';
 
-type ToolkitSource = { domElement: HTMLVideoElement | null; ready: boolean; init: (ready: () => void, error?: (e: { name?: string; message?: string }) => void) => void; onResizeElement: () => void; copyElementSizeTo: (el: HTMLElement) => void; dispose: () => void };
-type ToolkitContext = { arController: { canvas: HTMLCanvasElement } | null; init: (ready: () => void) => void; getProjectionMatrix: () => THREE.Matrix4; update: (el: HTMLVideoElement) => void };
+type Box = { x: number; y: number; width: number; height: number };
+type Cv = any;
+
+async function loadOpenCv(): Promise<Cv> {
+  const existing = (window as any).cv;
+  if (existing?.Mat) return existing;
+  return await new Promise<Cv>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = '/api/opencvjs';
+    script.async = true;
+    const timeout = window.setTimeout(() => reject(new Error('OpenCV.js did not initialize.')), 30000);
+    script.onload = () => {
+      const candidate = (window as any).cv;
+      if (!candidate) { window.clearTimeout(timeout); reject(new Error('OpenCV.js runtime is unavailable.')); return; }
+      if (candidate.Mat) { window.clearTimeout(timeout); resolve(candidate); }
+      else candidate.onRuntimeInitialized = () => { window.clearTimeout(timeout); resolve(candidate); };
+    };
+    script.onerror = () => { window.clearTimeout(timeout); reject(new Error('Could not load the OpenCV.js runtime.')); };
+    document.head.appendChild(script);
+  });
+}
 
 export default function MarkerARViewer({ heatmap, onClose }: { heatmap: RotorHeatmap; onClose: () => void }) {
-  const mount = useRef<HTMLDivElement>(null);
-  const transform = useRef({ diameter: 270, x: 0, z: 0, rotation: 0 });
-  const [diameter, setDiameter] = useState('270');
-  const [offsetX, setOffsetX] = useState('0');
-  const [offsetZ, setOffsetZ] = useState('0');
-  const [rotation, setRotation] = useState('0');
-  const [status, setStatus] = useState('Starting camera and marker tracker…');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [status, setStatus] = useState('Loading OpenCV and starting the camera…');
   const [tracked, setTracked] = useState(false);
   const trackedRef = useRef(false);
 
   useEffect(() => {
-    transform.current = {
-      diameter: Number(diameter) || 270,
-      x: Number(offsetX) || 0,
-      z: Number(offsetZ) || 0,
-      rotation: Number(rotation) || 0,
-    };
-  }, [diameter, offsetX, offsetZ, rotation]);
-
-  useEffect(() => {
     let alive = true;
-    let frame = 0;
-    let contextReady = false;
-    let source: ToolkitSource | null = null;
-    let context: ToolkitContext | null = null;
-    let renderer: THREE.WebGLRenderer | null = null;
-    let scene: THREE.Scene | null = null;
-    let markerRoot: THREE.Group | null = null;
-    let part: THREE.Group | null = null;
-    const host = mount.current;
-    if (!host) return;
+    let raf = 0;
+    let stream: MediaStream | null = null;
+    let cv: Cv;
+    let capture: Cv;
+    let frameImage: Cv;
+    let gray: Cv;
+    let blurred: Cv;
+    let edges: Cv;
+    let hierarchy: Cv;
+    let contours: Cv;
+    let smoothed: Box | null = null;
+    let lostFrames = 0;
+    let lastUi = 0;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!video || !canvas || !ctx) return;
 
-    const fail = (message: string) => { if (alive) setStatus(message); };
-    const resize = () => {
-      if (!source || !renderer) return;
-      source.onResizeElement();
-      source.copyElementSizeTo(renderer.domElement);
-      if (context?.arController) source.copyElementSizeTo(context.arController.canvas);
-      renderer.setSize(window.innerWidth, window.innerHeight, false);
-    };
-
-    void (async () => {
+    const start = async () => {
       try {
-        const tracking = await import('@ar-js-org/ar.js/three.js/build/ar-threex.mjs');
+        cv = await loadOpenCv();
         if (!alive) return;
-        tracking.ArToolkitContext.baseURL = '/ar/three.js/';
-        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: false });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.setClearColor(0x000000, 0);
-        renderer.domElement.className = 'marker-ar-canvas';
-        host.appendChild(renderer.domElement);
-
-        scene = new THREE.Scene();
-        const camera = new THREE.Camera();
-        scene.add(camera);
-        context = new tracking.ArToolkitContext({
-          cameraParametersUrl: '/ar/data/data/camera_para.dat', detectionMode: 'mono', canvasWidth: 640, canvasHeight: 480,
-        });
-        context.init(() => {
-          if (!alive || !context) return;
-          contextReady = true;
-          camera.projectionMatrix.copy(context.getProjectionMatrix());
-          setStatus('Camera ready. Center the 40 mm Hiro marker on the rotor hub.');
-        });
-        markerRoot = new THREE.Group();
-        markerRoot.visible = false;
-        scene.add(markerRoot);
-
-        const markerWidthM = 0.04;
-        new tracking.ArMarkerControls(context, markerRoot, {
-          type: 'pattern', patternUrl: '/ar/data/data/patt.hiro', size: markerWidthM, smooth: true, smoothCount: 4,
-        });
-
-        part = new THREE.Group();
-        markerRoot.add(part);
-        const heatLayer = buildHeatmap(heatmap);
-        if (!heatLayer) throw new Error('Heatmap grid is empty.');
-        part.add(heatLayer);
-        const edge = new THREE.Mesh(
-          new THREE.RingGeometry(134.3, 135, 128),
-          new THREE.MeshBasicMaterial({ color: 0x78e0ce, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }),
-        );
-        edge.rotation.x = -Math.PI / 2;
-        edge.position.y = 22.4;
-        part.add(edge);
-
-        source = new tracking.ArToolkitSource({ sourceType: 'webcam', sourceWidth: 640, sourceHeight: 480 });
-        source.init(() => {
-          if (!alive || !source) return;
-          const video = source.domElement;
-          if (video) {
-            video.style.position = 'fixed';
-            video.style.inset = '0';
-            video.style.width = '100vw';
-            video.style.height = '100vh';
-            video.style.objectFit = 'cover';
-            video.style.zIndex = '1000';
-          }
-          resize();
-        }, error => fail(`Camera could not start: ${error.message ?? error.name ?? 'permission denied'}. Use HTTPS or localhost and allow camera access.`));
-        window.addEventListener('resize', resize);
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 960 }, height: { ideal: 720 } }, audio: false });
+        if (!alive) { stream.getTracks().forEach(track => track.stop()); return; }
+        video.srcObject = stream;
+        await video.play();
+        capture = new cv.VideoCapture(video);
+        frameImage = new cv.Mat(); gray = new cv.Mat(); blurred = new cv.Mat(); edges = new cv.Mat();
+        hierarchy = new cv.Mat(); contours = new cv.MatVector();
+        setStatus('Show the full bottle upright against a plain background. Keep the camera steady.');
 
         const render = () => {
-          if (!alive || !renderer || !scene || !context || !source) return;
-          frame = requestAnimationFrame(render);
-          if (contextReady && source.ready && source.domElement) {
-            context.update(source.domElement);
-            const isTracked = Boolean(markerRoot?.visible);
-            if (trackedRef.current !== isTracked) {
-              trackedRef.current = isTracked;
-              setTracked(isTracked);
-              setStatus(isTracked ? 'Hiro marker tracked · overlay follows its pose.' : 'Show the printed Hiro marker to the camera.');
+          if (!alive || !video.videoWidth) return;
+          raf = requestAnimationFrame(render);
+          const w = video.videoWidth, h = video.videoHeight;
+          if (canvas.width !== canvas.clientWidth * devicePixelRatio || canvas.height !== canvas.clientHeight * devicePixelRatio) {
+            canvas.width = Math.round(canvas.clientWidth * devicePixelRatio);
+            canvas.height = Math.round(canvas.clientHeight * devicePixelRatio);
+          }
+          const cw = canvas.width, ch = canvas.height;
+          ctx.clearRect(0, 0, cw, ch);
+          capture.read(frameImage);
+          cv.cvtColor(frameImage, gray, cv.COLOR_RGBA2GRAY);
+          cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+          cv.Canny(blurred, edges, 45, 125);
+          const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(7, 7));
+          cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel);
+          kernel.delete();
+          cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+          let best: Box | null = null;
+          let bestScore = 0;
+          for (let i = 0; i < contours.size(); i++) {
+            const contour = contours.get(i);
+            const area = cv.contourArea(contour);
+            if (area < w * h * 0.012) { contour.delete(); continue; }
+            const rect = cv.boundingRect(contour);
+            const aspect = rect.width / Math.max(rect.height, 1);
+            const centerX = (rect.x + rect.width / 2) / w;
+            if (rect.height < h * 0.24 || aspect < 0.12 || aspect > 1.05 || centerX < 0.12 || centerX > 0.88) { contour.delete(); continue; }
+            const centerPenalty = 1 - Math.abs(centerX - 0.5);
+            const score = area * centerPenalty;
+            if (score > bestScore) { bestScore = score; best = { x: rect.x, y: rect.y, width: rect.width, height: rect.height }; }
+            contour.delete();
+          }
+          if (best) {
+            lostFrames = 0;
+            smoothed = smoothed ? {
+              x: smoothed.x * 0.65 + best.x * 0.35, y: smoothed.y * 0.65 + best.y * 0.35,
+              width: smoothed.width * 0.65 + best.width * 0.35, height: smoothed.height * 0.65 + best.height * 0.35,
+            } : best;
+          } else if (++lostFrames > 8) smoothed = null;
+
+          const isTracked = smoothed !== null;
+          if (isTracked !== trackedRef.current && performance.now() - lastUi > 700) {
+            trackedRef.current = isTracked; setTracked(isTracked); lastUi = performance.now();
+            setStatus(isTracked ? 'Bottle outline tracked. Hold it steady for a cleaner overlay.' : 'Bottle not found. Center it against a plain background.');
+          }
+          if (smoothed) {
+            // Match the object-fit:cover camera crop to the overlay coordinate space.
+            const scale = Math.max(cw / w, ch / h);
+            const ox = (cw - w * scale) / 2, oy = (ch - h * scale) / 2;
+            const x = ox + smoothed.x * scale, y = oy + smoothed.y * scale;
+            const bw = smoothed.width * scale, bh = smoothed.height * scale;
+            const insetX = bw * 0.16, insetY = bh * 0.1;
+            ctx.save();
+            ctx.beginPath(); ctx.roundRect(x + insetX, y + insetY, bw - insetX * 2, bh - insetY * 2, Math.min(bw * 0.22, 40 * devicePixelRatio)); ctx.clip();
+            const rows = heatmap.grid.length, cols = heatmap.grid[0]?.length ?? 0;
+            for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+              const value = heatmap.grid[row][col];
+              const flagged = value > heatmap.threshold;
+              ctx.fillStyle = flagged ? `rgba(255, ${Math.max(75, 165 - Math.round((value - heatmap.threshold) * 70))}, 54, 0.3)` : 'rgba(46, 154, 214, 0.12)';
+              const cellX = x + insetX + col * (bw - insetX * 2) / cols;
+              const cellY = y + insetY + row * (bh - insetY * 2) / rows;
+              ctx.fillRect(cellX, cellY, (bw - insetX * 2) / cols + 1, (bh - insetY * 2) / rows + 1);
             }
-            if (part) {
-              const current = transform.current;
-              // Marker sits on the modeled hat top (34 mm); friction face is at 22 mm.
-              part.position.set(current.x * 0.001, -0.034, current.z * 0.001);
-              part.rotation.y = THREE.MathUtils.degToRad(current.rotation);
-              part.scale.setScalar((current.diameter / 270) * 0.001);
-            }
-            renderer.render(scene, camera);
+            ctx.restore();
+            ctx.strokeStyle = '#61f0d0'; ctx.lineWidth = 3 * devicePixelRatio;
+            ctx.beginPath(); ctx.roundRect(x, y, bw, bh, Math.min(bw * 0.25, 52 * devicePixelRatio)); ctx.stroke();
+            ctx.fillStyle = 'rgba(8, 31, 35, .78)'; ctx.beginPath(); ctx.roundRect(x, Math.max(0, y - 32 * devicePixelRatio), 170 * devicePixelRatio, 27 * devicePixelRatio, 10 * devicePixelRatio); ctx.fill();
+            ctx.fillStyle = '#eafff8'; ctx.font = `${12 * devicePixelRatio}px sans-serif`; ctx.fillText('BOTTLE TRACKED · DEMO HEATMAP', x + 9 * devicePixelRatio, Math.max(18, y - 14 * devicePixelRatio));
           }
         };
         render();
       } catch (error) {
-        fail(error instanceof Error ? `AR could not initialize: ${error.message}` : 'AR could not initialize.');
+        if (alive) setStatus(error instanceof Error ? `Could not start bottle tracking: ${error.message}` : 'Could not start bottle tracking. Check camera permission.');
       }
-    })();
-
+    };
+    void start();
     return () => {
-      alive = false;
-      cancelAnimationFrame(frame);
-      window.removeEventListener('resize', resize);
-      source?.dispose();
-      renderer?.dispose();
-      renderer?.domElement.remove();
-      if (scene) scene.traverse(object => {
-        const mesh = object as THREE.Mesh;
-        mesh.geometry?.dispose();
-        const material = mesh.material;
-        const disposeMaterial = (item: THREE.Material) => {
-          (item as THREE.Material & { map?: THREE.Texture }).map?.dispose();
-          item.dispose();
-        };
-        if (Array.isArray(material)) material.forEach(disposeMaterial);
-        else if (material) disposeMaterial(material);
-      });
-      context = null;
-      markerRoot = null;
-      part = null;
+      alive = false; cancelAnimationFrame(raf);
+      stream?.getTracks().forEach(track => track.stop());
+      for (const item of [capture, frameImage, gray, blurred, edges, hierarchy, contours]) item?.delete?.();
     };
   }, [heatmap.grid, heatmap.threshold]);
 
-  return <div className="marker-ar" role="dialog" aria-modal="true" aria-label="Tracked AR heatmap">
-    <div className="marker-ar-stage" ref={mount} />
-    <header className="marker-ar-head"><div><strong>LINEGUARD · TRACKED AR</strong><span className={tracked ? 'tracking-live' : ''}>{tracked ? 'MARKER LOCKED' : 'SEARCHING FOR MARKER'}</span></div><button className="icon-button" aria-label="Close AR" onClick={onClose}><X size={18} /></button></header>
-    <aside className="marker-ar-panel">
-      <h2>Rotor alignment</h2>
-      <p>{status}</p>
-      <a href="/marker" target="_blank" rel="noreferrer">Open 40 mm marker print page</a>
-      <div className="marker-ar-fields">
-        <label>Disc diameter (mm)<input type="number" min="100" max="600" value={diameter} onChange={e => setDiameter(e.target.value)} /></label>
-        <label>Center offset X (mm)<input type="number" step="1" value={offsetX} onChange={e => setOffsetX(e.target.value)} /></label>
-        <label>Center offset Z (mm)<input type="number" step="1" value={offsetZ} onChange={e => setOffsetZ(e.target.value)} /></label>
-        <label>Image rotation (°)<input type="number" min="-180" max="180" value={rotation} onChange={e => setRotation(e.target.value)} /></label>
-      </div>
-      <p className="marker-ar-caution">The marker pose is tracked live. Put its 40 mm black square at the disc center and set the measured diameter. The heatmap still comes from an unvalidated proxy model and is not a brake-disc defect measurement.</p>
-    </aside>
-    <span className="marker-ar-crosshair" aria-hidden="true" />
+  return <div className="marker-ar bottle-ar" role="dialog" aria-modal="true" aria-label="Markerless bottle tracking demo">
+    <video ref={videoRef} className="bottle-ar-video" playsInline muted />
+    <canvas ref={canvasRef} className="bottle-ar-canvas" />
+    <header className="marker-ar-head"><div><strong>LINEGUARD · BOTTLE TRACKING</strong><span className={tracked ? 'tracking-live' : ''}>{tracked ? 'OBJECT LOCKED' : 'SEARCHING FOR BOTTLE'}</span></div><button className="icon-button" aria-label="Close AR" onClick={onClose}><X size={18} /></button></header>
+    <aside className="marker-ar-panel"><h2>Markerless demo</h2><p>{status}</p><p className="marker-ar-caution">OpenCV tracks the bottle outline in the camera image. The colored grid is an illustrative proxy heatmap; it is not attached to the metal surface in 3D and is not a defect measurement.</p></aside>
   </div>;
 }
