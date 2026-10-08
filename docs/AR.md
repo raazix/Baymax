@@ -1,19 +1,22 @@
-# Markerless bottle overlay demo
+# Bottle camera heatmap
 
-The dashboard's bottle AR demo uses OpenCV.js in the browser to find a tall, centered contour in the webcam image. It draws a smoothed outline and the inspection's PatchCore grid over that screen-space region. It needs no printed marker.
+The view uses OpenCV.js to find a tall centered contour, then submits a lossless PNG crop from that exact webcam frame to the camera quality gate and PatchCore. It never uses the uploaded inspection's heatmap.
 
 ## Try it locally
 
-1. Start the API and dashboard as usual and open an uploaded casting inspection that has a PatchCore heatmap.
-2. Choose **Try bottle AR demo** and allow webcam access. Camera access requires localhost or HTTPS.
-3. Place a steel bottle upright in the center of the camera view. Use a plain contrasting background, show the full bottle, and keep the camera steady.
+1. Start the API and dashboard and open a casting inspection.
+2. Choose **Bottle camera heatmap**, allow camera access, and center the full upright bottle against a plain contrasting background. Use localhost or HTTPS.
+3. Captures are analyzed automatically, with a single request at a time, 2.5 seconds between completed requests and a 45-second request timeout.
+4. The custom `bottle` model is selected when registered; otherwise the dashboard's selected model is used. You can change models in the viewer. All models remain experimental for your steel bottle.
 
-## Scope and limits
+## Registration and evidence
 
-This is a lightweight markerless visualization prototype. OpenCV contour geometry estimates a 2D bounding region; it does not recognize bottles, estimate full 6-DoF pose, or reconstruct the curved metal surface. Reflections, weak contrast, clutter, camera motion, and partial occlusion can cause the outline to drift or disappear. The heatmap is drawn inside the detected outline but comes from a separate inspection image, so it is illustrative and is not registered to actual bottle defects. It is not validated for brake discs, bottle inspection, acceptance decisions, metrology, or safety determinations.
+The PNG crop is hashed locally. Stored-frame and inference hashes, frame ID and model name must match before rendering. The grid is drawn at the crop's original coordinates with the source frame's camera-cover transform. Only above-threshold patches are colored. Quality failures prevent model inference. Failures clear the heatmap; closing or switching models aborts requests and ignores late results.
 
-The full-frame OpenCV.js runtime is served locally from the installed npm package at `/api/opencvjs`, so the browser does not need to fetch a third-party runtime CDN.
+The view displays the **exact analyzed snapshot**, its crop outline, capture time, score, threshold and image hash prefix. It holds that snapshot until the next result. This is sampled camera analysis, not real-time 3D surface registration. A delayed result is never drawn over different moving pixels. The API stores crop images and model runs for traceability.
 
-## Validation status
+## Limits and validation
 
-TypeScript and the Next.js production build pass. The OpenCV runtime route responds with JavaScript. Webcam permission, contour lock, and overlay behavior still need a live browser/device check with the bottle.
+Contours estimate a 2D region, not bottle identity or 6-DoF pose. PatchCore grids are coarse feature distances rather than pixel segmentation masks. Background and reflections can trigger scores. Accuracy on the actual steel bottle needs representative normal training images and labeled held-out evaluation.
+
+OpenCV is served locally at `/api/opencvjs`; its Promise export is awaited. Run `node scripts/test_bottle_heatmap.cjs` for regression checks covering crop bounds, camera-cover mapping, threshold transparency, invalid grids, image identity, quality gating and the request contract. These pass, along with a real API round trip on a local normal bottle image and the production build. Physical webcam operation and localization still require device testing.

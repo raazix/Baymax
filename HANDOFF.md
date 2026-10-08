@@ -4,6 +4,10 @@ Last updated: 2026-10-08T19:50:35+05:30. Workspace: `D:aymax`, PowerShell, Wind
 
 ## User intent and constraints
 
+### Latest change: camera heatmap alignment (2026-10-09)
+
+The bottle camera view now runs fresh PatchCore inference on a PNG crop from the exact OpenCV camera frame. It no longer receives or stretches the uploaded inspection grid. Local/stored/inference hashes plus frame/model IDs must match. The returned grid maps to the crop's original image coordinates and is rendered over the matching analyzed snapshot, with transparent below-threshold patches. Snapshots refresh automatically after sequential requests; each is labeled with capture time, score, threshold and image hash. This is sampled camera analysis, not 3D AR surface registration. Custom `bottle` is preferred if registered, with a selector to change models. Accuracy on the user's steel bottle is still unvalidated. Camera quality gate remains active; failures clear heatmaps, pending requests abort on close/model change, and late responses are ignored. Regression script: `node scripts/test_bottle_heatmap.cjs`; checks passed. Real API PNG/quality/inference round trip on a local normal bottle sample passed with matching hashes, 37x28 grid, score 2.726 and threshold 3.759. See `docs/AR.md`. Historical descriptions of stretching the uploaded grid below are superseded.
+
 - Hackathon: Singularity 2026, **Track 3 automotive quality inspection**. The local PPT was reviewed earlier; see `docs/TRACK3.md`.
 - Target remains **brake discs**. Casting component images and NEU steel-surface images are **proxy datasets**, never validated brake-disc evidence.
 - User has webcam and RTX 4050 Laptop GPU, 6 GB VRAM. Initially iGPU-only; switching modes and restarting enabled CUDA.
