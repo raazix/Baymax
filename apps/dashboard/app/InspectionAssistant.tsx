@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, Square, Volume2, MessageSquare } from 'lucide-react';
 
-type Answer = { id: string; answer: string; model: string; citations: { id: string; url: string; pointer: string }[] };
+type Answer = { id: string; answer: string; model: string; citations: { id: string; url?: string; pointer?: string; source?: string; summary?: string }[] };
 async function checked(response: Response) {
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -55,6 +55,25 @@ export default function InspectionAssistant({ inspectionId }: { inspectionId: st
         if (voiceQuestion.current && voiceReady) { voiceQuestion.current = false; await speak(result); }
       }
     } catch (e) { if (alive.current) setError(e instanceof Error ? e.message : 'Unable to explain this inspection.'); }
+    finally { if (alive.current) setBusy(''); }
+  }
+
+  useEffect(() => {
+    if (ready) void askDefault();
+  // A new uploaded inspection gets a concise evidence-linked summary automatically.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inspectionId, ready]);
+
+  async function askDefault() {
+    setBusy('Preparing evidence summary...'); setError('');
+    try {
+      const response = await checked(await fetch(`/api/inspections/${inspectionId}/assistant`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: 'Summarize the image-derived findings, severity rule, recommended action, and any important model or measurement limits. Do not decide or approve the action.' }),
+      }));
+      const result: Answer = await response.json();
+      if (alive.current) setAnswer(result);
+    } catch (e) { if (alive.current) setError(e instanceof Error ? e.message : 'Unable to prepare the evidence summary.'); }
     finally { if (alive.current) setBusy(''); }
   }
 
@@ -113,7 +132,7 @@ export default function InspectionAssistant({ inspectionId }: { inspectionId: st
     </form>
     <p className="muted" role="status">{recording ? 'Recording. Stop when finished (30-second limit).' : 'Check the transcript before sending. AI explanations require engineer review.'}</p>
     {error && <p className="inference-error" role="alert">{error}</p>}
-    {answer && <div className="assistant-answer"><p>{answer.answer}</p><div className="assistant-sources">{answer.citations.map(c => <a key={c.id} href={c.url} target="_blank" rel="noreferrer">{c.id}</a>)}<button type="button" onClick={() => void speak()} disabled={Boolean(busy) || recording || !voiceReady}><Volume2 size={16} aria-hidden="true" /> Listen</button></div></div>}
+    {answer && <div className="assistant-answer"><p>{answer.answer}</p><div className="assistant-sources">{answer.citations.map(c => c.url ? <a key={c.id} href={c.url} target="_blank" rel="noreferrer">{c.id}</a> : <span key={c.id} title={c.summary}>{c.source || c.id}</span>)}<button type="button" onClick={() => void speak()} disabled={Boolean(busy) || recording || !voiceReady}><Volume2 size={16} aria-hidden="true" /> Listen</button></div></div>}
     {audioUrl && <audio controls autoPlay src={audioUrl} aria-label="Spoken inspection explanation" />}
   </section>;
 }

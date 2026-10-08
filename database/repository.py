@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, select, update, event
 from sqlalchemy.orm import Session
 from core.config import DATABASE_URL, ROOT
 from database.models import (Base, Inspection, Part, Telemetry, RiskAndRCA, CorrectiveAction,
-    InspectionRevision, AuditEvent, AnalyticsJob, Frame, ModelRun)
+    InspectionRevision, AuditEvent, AnalyticsJob, Frame, ModelRun, SensorDataset, HistoricalSensorReading)
 
 class ConflictError(Exception): pass
 
@@ -22,7 +22,7 @@ def evidence_digest(payload):
 class Repository:
     def __init__(self, url=DATABASE_URL):
         (ROOT / 'data').mkdir(exist_ok=True)
-        self.engine = create_engine(url, connect_args={'check_same_thread': False, 'timeout': 15} if url.startswith('sqlite') else {})
+        self.engine = create_engine(url, connect_args={'check_same_thread': False, 'timeout': 15} if url.startswith('sqlite') else {'connect_timeout': 10}, pool_pre_ping=True, pool_recycle=300, pool_size=5, max_overflow=5)
         if url.startswith('sqlite'):
             @event.listens_for(self.engine, 'connect')
             def configure_sqlite(connection, _):
@@ -178,3 +178,64 @@ class Repository:
         with Session(self.engine) as session:
             record = session.get(ModelRun, identifier)
             return deepcopy(record.payload) if record else None
+
+    def import_sensor_dataset(self, dataset, readings):
+        """Atomically save an import manifest and its deduplicated sensor observations."""
+        from sqlalchemy import select
+        with self.lock, Session(self.engine) as session, session.begin():
+            existing_dataset = session.get(SensorDataset, dataset['sha256'])
+            if existing_dataset:
+                return {'sha256': existing_dataset.sha256, 'filename': existing_dataset.filename,
+                    'source_label': existing_dataset.source_label, 'rows_read': existing_dataset.rows_read,
+                    'rows_inserted': 0, 'rows_duplicate': existing_dataset.rows_read, 'already_imported': True}
+            candidates = {item['id']: item for item in readings}
+            present = set(session.scalars(select(HistoricalSensorReading.id).where(HistoricalSensorReading.id.in_(candidates)))) if candidates else set()
+            new_readings = [item for key, item in candidates.items() if key not in present]
+            manifest = SensorDataset(**(dataset | {'rows_inserted': len(new_readings), 'rows_duplicate': dataset['rows_duplicate'] + len(readings) - len(new_readings)}))
+            session.add(manifest)
+            session.add_all(HistoricalSensorReading(**item) for item in new_readings)
+            return {'sha256': manifest.sha256, 'filename': manifest.filename, 'source_label': manifest.source_label,
+                'rows_read': manifest.rows_read, 'rows_inserted': manifest.rows_inserted,
+                'rows_duplicate': manifest.rows_duplicate, 'already_imported': False}
+
+    def sensor_catalog(self):
+        from sqlalchemy import select, func
+        with Session(self.engine) as session:
+            machines = list(session.scalars(select(HistoricalSensorReading.machine_id).distinct().order_by(HistoricalSensorReading.machine_id)))
+            sensors = list(session.scalars(select(HistoricalSensorReading.sensor_name).distinct().order_by(HistoricalSensorReading.sensor_name)))
+            return {'machines': machines, 'sensors': sensors, 'reading_count': session.scalar(select(func.count()).select_from(HistoricalSensorReading)) or 0,
+                'dataset_count': session.scalar(select(func.count()).select_from(SensorDataset)) or 0,
+                'source': 'imported historical sensor readings; source labels are user supplied'}
+
+    def sensor_history(self, machine_id, sensor_name, start, end, limit=500):
+        from sqlalchemy import select, and_, func
+        from datetime import timedelta
+        with Session(self.engine) as session:
+            where = and_(HistoricalSensorReading.machine_id == machine_id,
+                HistoricalSensorReading.sensor_name == sensor_name, HistoricalSensorReading.observed_at >= start,
+                HistoricalSensorReading.observed_at < end)
+            count = session.scalar(select(func.count()).select_from(HistoricalSensorReading).where(where)) or 0
+            # Uniformly thin very high-rate telemetry in SQL before returning chart points.
+            stride = max(1, count // limit)
+            ranked = select(HistoricalSensorReading.id.label('id'),
+                func.row_number().over(order_by=HistoricalSensorReading.observed_at).label('rn')).where(where).subquery()
+            sampled_ids = select(ranked.c.id).where((ranked.c.rn % stride) == 0).limit(limit)
+            rows = list(session.scalars(select(HistoricalSensorReading).where(HistoricalSensorReading.id.in_(sampled_ids)).order_by(HistoricalSensorReading.observed_at)))
+            aggregates = [func.avg(HistoricalSensorReading.value), func.min(HistoricalSensorReading.value),
+                          func.max(HistoricalSensorReading.value)]
+            if self.engine.dialect.name == 'postgresql':
+                aggregates.append(func.stddev_samp(HistoricalSensorReading.value))
+            stats = session.execute(select(*aggregates).where(where)).one()
+            if self.engine.dialect.name == 'sqlite':
+                import statistics
+                values = list(session.scalars(select(HistoricalSensorReading.value).where(where)))
+                stddev = statistics.stdev(values) if len(values) > 1 else 0.0
+            else:
+                stddev = stats[3] or 0.0
+            if count and rows:
+                last = session.execute(select(HistoricalSensorReading).where(where).order_by(HistoricalSensorReading.observed_at.desc()).limit(1)).scalar_one()
+                if rows[-1].id != last.id:
+                    rows = (rows + [last])[-limit:]
+            points = [{'observed_at': item.observed_at.isoformat(), 'value': item.value, 'unit': item.unit, 'lot_id': item.lot_id} for item in rows]
+            return {'points': points, 'count': count, 'mean': stats[0], 'min': stats[1], 'max': stats[2],
+                'stddev': stddev, 'unit': points[0]['unit'] if points else None}

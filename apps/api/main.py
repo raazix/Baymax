@@ -1,6 +1,8 @@
 import hashlib
 import json
 import os
+import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import secrets
 from typing import Literal
@@ -20,10 +22,13 @@ from vision.patchcore_anomaly import PatchCoreDetector, PatchCoreUnavailable
 from vision import patchcore_custom
 from analytics.briefing import evidence_packet
 from analytics import assistant
+from analytics import historical_sensors
+from analytics import supermemory
 from pydantic import BaseModel, ConfigDict, Field
 from analytics.service import analyze as analyze_process, status as analytics_status, model_versions as analytics_versions, AnalyticsUnavailable
 
 app = FastAPI(title='LineGuard', version='0.1.0', description='Evidence-linked Track 3 hackathon scaffold')
+logger = logging.getLogger(__name__)
 
 class AssistantQuestion(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -35,7 +40,13 @@ async def assistant_error(request, error):
 
 @app.get('/api/assistant/status')
 def assistant_status():
-    return assistant.status()
+    return assistant.status() | {'supermemory': supermemory.status()}
+
+@app.post('/api/inspections/{identifier}/alert-speech')
+async def inspection_alert_speech(identifier: str):
+    record = await run_in_threadpool(inspection, identifier)
+    audio = await assistant.alert_speech(record)
+    return Response(audio, media_type='audio/mpeg', headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
 
 @app.post('/api/inspections/{identifier}/assistant')
 async def inspection_assistant(identifier: str, question: AssistantQuestion):
@@ -244,12 +255,15 @@ def patchcore_train(name: str):
 @app.get('/api/models')
 def model_status():
     analytics = analytics_status()
+    assistant_status = assistant.status()
     return {'proxy_detection': proxy_detector.status(), 'rotor_segmentation': {'configured': False},
             'quality_profiles': profile_status(),
             'analytics_pipeline': {'mode': analytics_versions()['analytics'], 'production_validated': False},
             'patchcore': patchcore_detector.status(), 'xgboost_rca': analytics['xgboost_rca'],
             'plsr': analytics['plsr'], 'pcr': {**analytics['pcr'], 'role': 'benchmark'},
-            'llm': {'enabled': False}, 'supermemory': {'enabled': False}}
+            'llm': {'enabled': assistant_status['llm_configured'], 'read_only': True},
+            'voice_alerts': {'enabled': assistant_status['voice_configured'], 'automatic_levels': ['high', 'critical']},
+            'supermemory': supermemory.status()}
 
 @app.get('/api/health')
 def health():
@@ -257,7 +271,7 @@ def health():
     try:
         with repo.engine.connect() as connection: connection.execute(text('SELECT 1'))
     except Exception: raise HTTPException(503, 'Database unavailable')
-    return {'status': 'ok', 'mode': 'synthetic_replay',
+    return {'status': 'ok', 'mode': 'synthetic_replay', 'database': repo.engine.dialect.name,
             'trained_models': proxy_detector.model is not None or analytics_versions()['analytics'] == 'trained-synthetic-v1',
             'auth_enabled': bool(os.getenv('LINEGUARD_API_TOKEN'))}
 
@@ -358,11 +372,54 @@ def audit(identifier: str):
     inspection(identifier)
     return {'events': repo.audit(identifier), 'integrity': repo.verify_audit(identifier)}
 
+@app.exception_handler(historical_sensors.SensorCSVError)
+async def sensor_csv_error(request, error):
+    return JSONResponse({'detail': str(error)}, status_code=422)
+
+@app.post('/api/history/sensor-datasets', status_code=201)
+async def import_sensor_dataset(request: Request,
+        filename: str = Query('sensor-history.csv', min_length=1, max_length=240),
+        source_label: str = Query('source not verified', max_length=180)):
+    content = bytearray()
+    async for chunk in request.stream():
+        if len(content) + len(chunk) > historical_sensors.MAX_BYTES:
+            raise HTTPException(413, 'CSV exceeds the 5 MiB upload limit.')
+        content.extend(chunk)
+    if request.headers.get('content-type', '').split(';', 1)[0].lower() not in ('text/csv', 'application/csv', 'application/octet-stream'):
+        raise HTTPException(415, 'Upload a UTF-8 CSV file as text/csv.')
+    dataset, readings = await run_in_threadpool(historical_sensors.parse_csv, bytes(content), filename, source_label)
+    try:
+        result = await run_in_threadpool(repo.import_sensor_dataset, dataset, readings)
+    except Exception:
+        logger.exception('Historical sensor import failed')
+        raise HTTPException(503, 'Historical sensor data could not be stored. Check PostgreSQL connectivity and database logs.') from None
+    return result | {'machine_count': len({r['machine_id'] for r in readings}),
+        'sensor_count': len({r['sensor_name'] for r in readings}), 'provenance': 'User-supplied source label; not independently verified.'}
+
+@app.get('/api/history/sensors/catalog')
+def sensor_catalog():
+    return repo.sensor_catalog()
+
+@app.get('/api/history/sensors/series')
+def sensor_series(machine_id: str = Query(..., min_length=1, max_length=80),
+                  sensor: str = Query(..., min_length=1, max_length=80),
+                  days: int = Query(30, ge=1, le=90)):
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=days)
+    baseline_start = start - timedelta(days=days)
+    current = repo.sensor_history(machine_id, sensor, start, end)
+    baseline = repo.sensor_history(machine_id, sensor, baseline_start, start, limit=1)
+    delta = None if baseline['mean'] in (None, 0) or current['mean'] is None else (current['mean'] - baseline['mean']) / abs(baseline['mean'])
+    return {'machine_id': machine_id, 'sensor': sensor, 'days': days,
+        'current_window': {'start': start.isoformat(), 'end': end.isoformat(), **current},
+        'previous_window': {'start': baseline_start.isoformat(), 'end': start.isoformat(), **{k:v for k,v in baseline.items() if k != 'points'}},
+        'mean_change_fraction': delta, 'source': 'Imported historical sensor observations; source labels are user supplied.'}
+
 @app.get('/api/inspections/{identifier}/briefing')
 def briefing(identifier: str): return evidence_packet(inspection(identifier))
 
 @app.post('/api/inspections/{identifier}/decision', response_model=InspectionResponse, response_model_exclude_none=True)
-def decision(identifier: str, request: DecisionRequest):
+async def decision(identifier: str, request: DecisionRequest):
     def transform(result):
         if result['action']['status'] != 'pending':
             raise HTTPException(409, 'Action must be pending to record a decision')
@@ -370,7 +427,11 @@ def decision(identifier: str, request: DecisionRequest):
         result['action'].update(status={'approve': 'approved', 'reject': 'rejected', 'escalate': 'escalated'}[request.decision], engineer=request.engineer.strip(), note=request.note, decided_at=now)
         result['audit'].append({'at': now, 'event': 'engineer_decision', **request.model_dump()})
         return result
-    try: return repo.update(identifier, transform)
+    try:
+        result = await run_in_threadpool(repo.update, identifier, transform)
+        if request.decision == 'approve':
+            await supermemory.remember_approved(result)
+        return result
     except KeyError: raise HTTPException(404, 'Inspection not found')
 
 @app.post('/api/inspections/{identifier}/verification', response_model=InspectionResponse, response_model_exclude_none=True)

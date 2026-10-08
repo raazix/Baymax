@@ -41,15 +41,19 @@ def _measure(defect: dict, geometry, scale) -> dict:
     return defect
 
 
-def _neu_defects(run: dict, geometry, scale) -> list[dict]:
+def _neu_defects(run: dict, shape, geometry, scale) -> list[dict]:
     defects = []
+    height, width = shape[:2]
     for d in run['detections']:
         x1, y1, x2, y2 = d['bbox_xyxy_px']
         w, h = x2 - x1, y2 - y1
-        defects.append(_measure({'label': d['label'], 'confidence': d['confidence'], 'bbox_xyxy_px': d['bbox_xyxy_px'],
+        defect = _measure({'label': d['label'], 'confidence': d['confidence'], 'bbox_xyxy_px': d['bbox_xyxy_px'],
                                  'centroid_px': [round((x1 + x2) / 2, 1), round((y1 + y2) / 2, 1)],
                                  'length_px': round(max(w, h), 1), 'width_px': round(min(w, h), 1), 'area_px': round(w * h, 1),
-                                 'severity': rate_proxy(d['label'])}, geometry, scale))
+                                 }, geometry, scale)
+        defect['severity'] = rate_proxy(d['label'], area_fraction=min(1.0, max(0.0, w * h / (width * height))),
+                                        max_side_fraction=min(1.0, max(w, h) / max(width, height)))
+        defects.append(defect)
     return defects
 
 
@@ -83,7 +87,7 @@ def create_upload_inspection(stored: dict, shape, model: str, process_context: s
     # Polar part coordinates only make sense for round parts (the casting model); steel images are flat patches.
     geometry = locate_part(frame) if passed and frame is not None and model == 'casting' else None
     scale, scale_source = scale_mm_per_px(geometry, part_diameter_mm, mm_per_px)
-    defects = [] if not passed or run is None else (_neu_defects(run, geometry, scale) if model == 'neu' else _casting_defects(run, shape, geometry, scale))
+    defects = [] if not passed or run is None else (_neu_defects(run, shape, geometry, scale) if model == 'neu' else _casting_defects(run, shape, geometry, scale))
     telemetry = dict(CONTEXTS[process_context])
     vision_sha = '' if run is None else run.get('model_sha256') or run.get('artifact_sha256') or ''
     versions = {'vision': f'uploaded-{model}-proxy:{vision_sha[:12]}', **model_versions()}

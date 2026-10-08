@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ScanSearch, FileCheck2, Camera, BrainCircuit, SlidersHorizontal } from 'lucide-react';
+import { ScanSearch, FileCheck2, Camera, BrainCircuit, SlidersHorizontal, Activity } from 'lucide-react';
 import PipelineTrace, { type PipelineModule } from './PipelineTrace';
 import ModelStatus from './ModelStatus';
 import dynamic from 'next/dynamic';
@@ -12,6 +12,7 @@ import TrainPatchCore from './TrainPatchCore';
 import ProcessLab from './ProcessLab';
 import InspectionAssistant from './InspectionAssistant';
 import PresenterBar, { type PresenterStep } from './PresenterBar';
+import HistorySensors from './HistorySensors';
 
 const RotorViewer = dynamic(() => import('./RotorViewer'), { ssr: false, loading: () => <p className="muted">Loading 3D view…</p> });
 
@@ -66,12 +67,13 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [engineer, setEngineer] = useState('');
   const [note, setNote] = useState('');
-  const [tab, setTab] = useState<'inspection' | 'audit' | 'camera' | 'train' | 'lab'>('inspection');
+  const [tab, setTab] = useState<'inspection' | 'audit' | 'camera' | 'train' | 'lab' | 'history'>('inspection');
   const [cameraStatus, setCameraStatus] = useState('');
   const [quality, setQuality] = useState<{ passed: boolean; laplacian_variance: number; specular_fraction: number } | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [alertAudio, setAlertAudio] = useState('');
 
   useEffect(() => { void loadModels(); }, []);
   useEffect(() => {
@@ -90,6 +92,18 @@ export default function Dashboard() {
     finally { setBusy(false); }
   }
   async function refresh(result: Inspection) { setCurrent(result); setRecords(await api<Inspection[]>('inspections')); }
+  async function autoSpeakAlert(result: Inspection) {
+    if (!result.defects.some(item => ['critical', 'high'].includes(item.severity.level))) return;
+    try {
+      const response = await fetch(`/api/inspections/${result.id}/alert-speech`, { method: 'POST', cache: 'no-store' });
+      if (!response.ok) return;
+      if (alertAudio) URL.revokeObjectURL(alertAudio);
+      const url = URL.createObjectURL(await response.blob());
+      setAlertAudio(url);
+      const audio = new Audio(url);
+      await audio.play().catch(() => { /* Visible controls remain for browsers that block automatic playback. */ });
+    } catch { /* Voice is an optional alert channel; the visual result remains available. */ }
+  }
   async function inspectFile(file: File, options: { model: 'casting' | 'neu'; processContext: string; lot?: string; machine?: string; patchcoreModel?: string; inferenceMode?: 'full' | 'sliced'; tileSize?: number; overlap?: number }): Promise<Inspection> {
     const params = new URLSearchParams({ model: options.model, process_context: options.processContext });
     if (options.model === 'neu') {
@@ -111,7 +125,7 @@ export default function Dashboard() {
   function upload(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    void operation(async () => { await refresh(await inspectFile(file, { model, processContext, patchcoreModel: castingModel, inferenceMode, tileSize, overlap: tileOverlap })); setTab('inspection'); });
+    void operation(async () => { const result = await inspectFile(file, { model, processContext, patchcoreModel: castingModel, inferenceMode, tileSize, overlap: tileOverlap }); await refresh(result); setTab('inspection'); await autoSpeakAlert(result); });
   }
   function decision(value: string) { if (!current) return; void operation(async () => { await refresh(await api<Inspection>(`inspections/${current.id}/decision`, { decision: value, engineer: engineer.trim(), note })); }); }
   function verifyFiles(files: FileList | null) {
@@ -230,11 +244,11 @@ export default function Dashboard() {
   return <div className="shell">
     <aside className="sidebar">
       <a className="brand" href="/">LineGuard<span>Quality intelligence</span></a>
-      <nav aria-label="Workspace">{(['inspection', 'audit', 'camera', 'train', 'lab'] as const).map(item => { const Icon = { inspection: ScanSearch, audit: FileCheck2, camera: Camera, train: BrainCircuit, lab: SlidersHorizontal }[item]; return <button key={item} className={tab === item ? 'nav active' : 'nav'} aria-current={tab === item ? 'page' : undefined} onClick={() => setTab(item)}>{tab === item && <motion.span layoutId="nav-active" className="nav-indicator" transition={{ duration: reduceMotion ? 0 : .28, ease: [0.16, 1, 0.3, 1] }} aria-hidden="true" />}<Icon size={17} strokeWidth={1.9} aria-hidden="true" /><span>{item === 'inspection' ? 'Inspection console' : item === 'audit' ? 'Evidence & audit' : item === 'camera' ? 'Camera station' : item === 'train' ? 'Train PatchCore' : 'Process what-if'}</span></button>; })}</nav>
+      <nav aria-label="Workspace">{(['inspection', 'audit', 'camera', 'train', 'lab', 'history'] as const).map(item => { const Icon = { inspection: ScanSearch, audit: FileCheck2, camera: Camera, train: BrainCircuit, lab: SlidersHorizontal, history: Activity }[item]; return <button key={item} className={tab === item ? 'nav active' : 'nav'} aria-current={tab === item ? 'page' : undefined} onClick={() => setTab(item)}>{tab === item && <motion.span layoutId="nav-active" className="nav-indicator" transition={{ duration: reduceMotion ? 0 : .28, ease: [0.16, 1, 0.3, 1] }} aria-hidden="true" />}<Icon size={17} strokeWidth={1.9} aria-hidden="true" /><span>{item === 'inspection' ? 'Inspection console' : item === 'audit' ? 'Evidence & audit' : item === 'camera' ? 'Camera station' : item === 'train' ? 'Train PatchCore' : item === 'history' ? 'Sensor history' : 'Process what-if'}</span></button>; })}</nav>
       <div className="sidebar-bottom"><span className="connection-dot" /> Local demo workspace<p>Track 3 · Singularity 2026</p></div><details className="sidebar-details"><summary>Model status</summary><ModelStatus /></details>
     </aside>
     <main>
-      <header className="topbar"><div><h1>{tab === 'inspection' ? 'Inspection console' : tab === 'audit' ? 'Evidence & audit' : tab === 'camera' ? 'Camera station' : tab === 'train' ? 'Train PatchCore' : 'Process what-if lab'}</h1><p>Find the flaw. Find the cause. Stop the next one.</p></div><div className="topbar-actions"><span className="demo-tag">UPLOADED IMAGES · PROXY MODELS</span>{!presenter && <button className="primary" onClick={startPresenter}>Presenter mode</button>}</div></header>
+      <header className="topbar"><div><h1>{tab === 'inspection' ? 'Inspection console' : tab === 'audit' ? 'Evidence & audit' : tab === 'camera' ? 'Camera station' : tab === 'train' ? 'Train PatchCore' : tab === 'history' ? 'Historical sensor data' : 'Process what-if lab'}</h1><p>Find the flaw. Find the cause. Stop the next one.</p></div><div className="topbar-actions"><span className="demo-tag">UPLOADED IMAGES · PROXY MODELS</span>{!presenter && <button className="primary" onClick={startPresenter}>Presenter mode</button>}</div></header>
       {presenter && <PresenterBar steps={presenterSteps} busy={busy} status={busy && progress ? progress : demoStatus} onClose={() => setPresenter(false)} />}
       {(tab === 'inspection' || tab === 'audit') && <section className="upload-workspace" aria-label="Inspection setup">
         <div className="upload-controls">
@@ -252,7 +266,8 @@ export default function Dashboard() {
         </div></details></div>
       </section>}
       {error && <div className="error" role="alert">{error}<button onClick={() => void operation(async () => { const data = await api<Inspection[]>('inspections'); setRecords(data); setCurrent(data[0] || null); })} disabled={busy}>Reconnect</button></div>}
-      <AnimatePresence mode="wait" initial={false}><motion.div key={tab} className="tab-body" initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: .1 } }} transition={{ duration: reduceMotion ? 0 : .2, ease: [0.16, 1, 0.3, 1] }}>{loading ? <div className="empty" role="status">Loading inspection history…</div> : tab === 'camera' ? <section className="camera panel"><h2>Capture quality check</h2><p>Check blur and bright reflections with your webcam, then run a trained proxy model below. Marker calibration is not connected yet.</p><video ref={video} autoPlay playsInline muted aria-label="Webcam preview" /><div className="buttons"><button className="primary" onClick={startCamera}>Start camera</button><button onClick={capture} disabled={busy || !cameraActive}>Check frame quality</button><button disabled={!cameraActive} onClick={() => { stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; setCameraActive(false); setCameraStatus('Camera stopped.'); }}>Stop camera</button></div><p role="status">{cameraStatus}</p>{quality && <dl className="measurements"><div><dt>Quality gate</dt><dd>{quality.passed ? 'Pass' : 'Recapture'}</dd></div><div><dt>Laplacian variance</dt><dd>{quality.laplacian_variance}</dd></div><div><dt>Bright pixel fraction</dt><dd>{percent(quality.specular_fraction)}</dd></div></dl>}<p className="footnote">Thresholds are provisional and require validation for your camera and lighting.</p><CameraInference grabFrame={grabFrame} cameraActive={cameraActive} patchcoreModel={castingModel} /></section> : tab === 'lab' ? <ProcessLab /> : tab === 'train' ? <TrainPatchCore onTrained={name => void loadModels(name)} /> : !current ? <section className="empty"><h2>Ready for the first inspection</h2><p>Choose a model above, then upload an image. It runs through the quality gate, the model, severity rules, root-cause and risk analytics, and an engineer decision.</p></section> : tab === 'audit' ? <section className="panel audit"><h2>Inspection evidence</h2><dl><dt>Inspection ID</dt><dd>{current.id}</dd><dt>Image SHA-256</dt><dd className="hash">{current.image_sha256}</dd><dt>Source</dt><dd>{current.source === 'uploaded_image' ? 'Uploaded image with real proxy-model output; process telemetry is a simulated preset' : 'Synthetic geometry and process telemetry'}</dd></dl><h2>Decision history</h2><table><thead><tr><th>Time</th><th>Event</th><th>Engineer</th></tr></thead><tbody>{current.audit.map((event, i) => <tr key={i}><td>{new Date(event.at).toLocaleString()}</td><td>{human(event.event)}</td><td>{event.engineer || (current.source === 'uploaded_image' ? 'Upload pipeline' : 'Replay system')}</td></tr>)}</tbody></table><a className="download" href={`/api/inspections/${current.id}`} target="_blank" rel="noreferrer">Open full evidence JSON</a></section> : <>
+      {alertAudio && <section className="voice-alert panel" aria-label="Spoken critical inspection alert"><strong>Voice alert</strong><span>Critical/high inspection finding · automatic readout</span><audio controls autoPlay src={alertAudio} aria-label="Spoken inspection alert" /></section>}
+      <AnimatePresence mode="wait" initial={false}><motion.div key={tab} className="tab-body" initial={{ opacity: 0, y: reduceMotion ? 0 : 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: .1 } }} transition={{ duration: reduceMotion ? 0 : .2, ease: [0.16, 1, 0.3, 1] }}>{loading && tab !== 'history' ? <div className="empty" role="status">Loading inspection history…</div> : tab === 'history' ? <HistorySensors /> : tab === 'camera' ? <section className="camera panel"><h2>Capture quality check</h2><p>Check blur and bright reflections with your webcam, then run a trained proxy model below. Marker calibration is not connected yet.</p><video ref={video} autoPlay playsInline muted aria-label="Webcam preview" /><div className="buttons"><button className="primary" onClick={startCamera}>Start camera</button><button onClick={capture} disabled={busy || !cameraActive}>Check frame quality</button><button disabled={!cameraActive} onClick={() => { stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; setCameraActive(false); setCameraStatus('Camera stopped.'); }}>Stop camera</button></div><p role="status">{cameraStatus}</p>{quality && <dl className="measurements"><div><dt>Quality gate</dt><dd>{quality.passed ? 'Pass' : 'Recapture'}</dd></div><div><dt>Laplacian variance</dt><dd>{quality.laplacian_variance}</dd></div><div><dt>Bright pixel fraction</dt><dd>{percent(quality.specular_fraction)}</dd></div></dl>}<p className="footnote">Thresholds are provisional and require validation for your camera and lighting.</p><CameraInference grabFrame={grabFrame} cameraActive={cameraActive} patchcoreModel={castingModel} /></section> : tab === 'lab' ? <ProcessLab /> : tab === 'train' ? <TrainPatchCore onTrained={name => void loadModels(name)} /> : !current ? <section className="empty"><h2>Ready for the first inspection</h2><p>Choose a model above, then upload an image. It runs through the quality gate, the model, severity rules, root-cause and risk analytics, and an engineer decision.</p></section> : tab === 'audit' ? <section className="panel audit"><h2>Inspection evidence</h2><dl><dt>Inspection ID</dt><dd>{current.id}</dd><dt>Image SHA-256</dt><dd className="hash">{current.image_sha256}</dd><dt>Source</dt><dd>{current.source === 'uploaded_image' ? 'Uploaded image with real proxy-model output; process telemetry is a simulated preset' : 'Synthetic geometry and process telemetry'}</dd></dl><h2>Decision history</h2><table><thead><tr><th>Time</th><th>Event</th><th>Engineer</th></tr></thead><tbody>{current.audit.map((event, i) => <tr key={i}><td>{new Date(event.at).toLocaleString()}</td><td>{human(event.event)}</td><td>{event.engineer || (current.source === 'uploaded_image' ? 'Upload pipeline' : 'Replay system')}</td></tr>)}</tbody></table><a className="download" href={`/api/inspections/${current.id}`} target="_blank" rel="noreferrer">Open full evidence JSON</a></section> : <>
         <div className="part-strip"><div><span>Part</span><strong>{current.part_id}</strong></div><div><span>Lot</span><strong>{current.lot_id}</strong></div><div><span>Machine</span><strong>{current.machine_id}</strong></div><div><span>Inspected</span><strong>{new Date(current.created_at).toLocaleTimeString()}</strong></div>{current.context?.inference?.mode === 'sliced' && <div><span>YOLO inference</span><strong>SAHI · {current.context.inference.tile_count} tiles</strong></div>}<span className={`status ${severity}`}>{human(severity)}</span></div>
         <details className="evidence-disclosure pipeline-disclosure"><summary>Pipeline evidence <span>9 inspection stages</span></summary><PipelineTrace inspection={current as unknown as Parameters<typeof PipelineTrace>[0]['inspection']} onJump={jumpTo} /></details>
         <div className="inspection-grid">

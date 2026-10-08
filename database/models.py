@@ -1,5 +1,6 @@
+from datetime import datetime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import JSON, String, Integer, ForeignKey, LargeBinary
+from sqlalchemy import JSON, String, Integer, ForeignKey, LargeBinary, Float, DateTime, Index, UniqueConstraint
 
 class Base(DeclarativeBase): pass
 
@@ -71,3 +72,28 @@ class ModelRun(Base):
     frame_id: Mapped[str] = mapped_column(ForeignKey('frames.id'), index=True)
     created_at: Mapped[str] = mapped_column(String(40))
     payload: Mapped[dict] = mapped_column(JSON)
+
+class SensorDataset(Base):
+    __tablename__ = 'sensor_datasets'
+    sha256: Mapped[str] = mapped_column(String(64), primary_key=True)
+    filename: Mapped[str] = mapped_column(String(180))
+    source_label: Mapped[str] = mapped_column(String(180), default='source not verified')
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    rows_read: Mapped[int] = mapped_column(Integer)
+    rows_inserted: Mapped[int] = mapped_column(Integer)
+    rows_duplicate: Mapped[int] = mapped_column(Integer)
+
+class HistoricalSensorReading(Base):
+    __tablename__ = 'historical_sensor_readings'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    dataset_sha256: Mapped[str] = mapped_column(ForeignKey('sensor_datasets.sha256'), index=True)
+    machine_id: Mapped[str] = mapped_column(String(80))
+    sensor_name: Mapped[str] = mapped_column(String(80))
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    value: Mapped[float] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(32))
+    lot_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    __table_args__ = (
+        UniqueConstraint('machine_id', 'sensor_name', 'observed_at', 'value', 'unit', name='uq_sensor_observation'),
+        Index('ix_sensor_machine_name_time', 'machine_id', 'sensor_name', 'observed_at'),
+    )
