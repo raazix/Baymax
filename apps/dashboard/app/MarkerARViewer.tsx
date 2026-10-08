@@ -31,6 +31,7 @@ export default function MarkerARViewer({ heatmap, onClose }: { heatmap: RotorHea
   useEffect(() => {
     let alive = true;
     let frame = 0;
+    let contextReady = false;
     let source: ToolkitSource | null = null;
     let context: ToolkitContext | null = null;
     let renderer: THREE.WebGLRenderer | null = null;
@@ -68,6 +69,7 @@ export default function MarkerARViewer({ heatmap, onClose }: { heatmap: RotorHea
         });
         context.init(() => {
           if (!alive || !context) return;
+          contextReady = true;
           camera.projectionMatrix.copy(context.getProjectionMatrix());
           setStatus('Camera ready. Center the 40 mm Hiro marker on the rotor hub.');
         });
@@ -112,7 +114,7 @@ export default function MarkerARViewer({ heatmap, onClose }: { heatmap: RotorHea
         const render = () => {
           if (!alive || !renderer || !scene || !context || !source) return;
           frame = requestAnimationFrame(render);
-          if (source.ready && source.domElement) {
+          if (contextReady && source.ready && source.domElement) {
             context.update(source.domElement);
             const isTracked = Boolean(markerRoot?.visible);
             if (trackedRef.current !== isTracked) {
@@ -158,7 +160,7 @@ export default function MarkerARViewer({ heatmap, onClose }: { heatmap: RotorHea
       markerRoot = null;
       part = null;
     };
-  }, [heatmap]);
+  }, [heatmap.grid, heatmap.threshold]);
 
   return <div className="marker-ar" role="dialog" aria-modal="true" aria-label="Tracked AR heatmap">
     <div className="marker-ar-stage" ref={mount} />
