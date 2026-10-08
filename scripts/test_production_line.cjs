@@ -11,6 +11,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '../data/browser-t
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     await page.goto(process.env.DASHBOARD_URL || 'http://127.0.0.1:3001');
     await page.getByRole('button', { name: 'Demonstrate critical defect' }).waitFor();
+    await page.getByRole('button', { name: 'Show live line' }).click();
     await page.locator('.production-scene canvas').waitFor();
     await page.getByRole('button', { name: 'Demonstrate critical defect' }).click();
     await page.getByText('Critical defect — simulated production stopped').waitFor();

@@ -1,8 +1,18 @@
 ﻿# LineGuard â€” project handoff and checkpoint tracker
 
-Last updated: 2026-10-08T19:50:35+05:30. Workspace: `D:aymax`, PowerShell, Windows. Read this file first when continuing with Claude, then verify current processes/artifacts.
+Last updated: 2026-10-09T05:24:24+05:30. Workspace: `D:aymax`, PowerShell, Windows. Read this file first when continuing with Claude, then verify current processes/artifacts.
 
 ## User intent and constraints
+
+### Latest checkpoint: responsive UI and protected phone demo (2026-10-09)
+
+User asked for improved layout, animation/effects and normal operation on a real phone. Implemented `workspace.css`, Motion transitions/animated values, Sonner notifications, Radix dialogs/sheets and QR pairing. Desktop image leads with cause/risk/action stacked alongside; phone bottom navigation, touch controls, full-screen camera, native capture fallback, sensor-aspect preview and progressive disclosure. Heavy Three.js rotor/production scenes load only on request; critical hold auto-opens the production scene. Hidden/offscreen rendering pauses and phone budgets are capped. Severity badge chooses the highest finding instead of blindly using the first. Existing engineering/proxy limits and approval interlock remain.
+
+See `docs/MOBILE_UI.md`. `scripts/start_phone_demo.ps1` starts a separate loopback dashboard on 3002 plus an installed Cloudflared HTTPS tunnel. Private six-digit pairing, signed 8-hour Secure/HttpOnly cookie, API gate, bad-code rejection/rate limit. Pairing state/URL/code/process IDs are in ignored `data/phone-demo.json`; server secret is environment-only. The desktop preview is on 3001; existing dev server on 3000 was preserved. Do not put live pairing codes or API/database credentials into Git. `stop_phone_demo.ps1` verifies saved commands before stopping only its demo processes.
+
+Verification: production build/TypeScript passed; desktop, Pixel 5, iPhone dimensions and 320px layouts fit; camera capture from a generated WebRTC frame passed actual quality/model/analytics and persisted provenance. Mobile sensor/lab navigation and critical approval/resume passed without runtime errors. Real HTTPS public endpoint blocks unpaired API requests and pairs correctly. A mobile browser through the actual tunnel paired and captured successfully. Physical phone/Safari camera and speaker behavior still need user confirmation. Screenshots and `mobile-verification.json` are in ignored data/browser-check. Impeccable detector reported no findings; visual checks used two bounded rounds. No additional model training or claimed accuracy improvements.
+
+
 
 ### Latest checkpoint: Track 3 audit and production lifecycle (2026-10-09)
 

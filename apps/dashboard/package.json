@@ -10,13 +10,16 @@
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.2.0",
+    "@radix-ui/react-dialog": "^1.2.0",
     "@techstark/opencv-js": "^5.0.0-release.1",
     "@types/three": "^0.186.0",
     "lucide-react": "^1.53.0",
     "motion": "^14.0.0",
     "next": "^16.0.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "sonner": "^2.0.8",
     "three": "^0.186.1"
   },
   "devDependencies": {

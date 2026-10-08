@@ -2,23 +2,23 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Camera, RefreshCw, X } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
 
 export default function CameraScanner({ modelLabel, onScan, onClose }: {
   modelLabel: string; onScan: (file: File, signal: AbortSignal) => Promise<void>; onClose: () => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
-  const dialog = useRef<HTMLDivElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
   const request = useRef<AbortController | null>(null);
   const submitting = useRef(false);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [aspectRatio, setAspectRatio] = useState(16 / 9);
 
   useEffect(() => {
-    const previousFocus = document.activeElement as HTMLElement | null;
-    dialog.current?.focus();
-    return () => { request.current?.abort(); previousFocus?.focus(); };
+    return () => { request.current?.abort(); };
   }, []);
 
   useEffect(() => {
@@ -67,21 +67,24 @@ export default function CameraScanner({ modelLabel, onScan, onClose }: {
     }
   }
 
-  return <div className="camera-scan-backdrop">
-    <div className="camera-scan-dialog" ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="camera-scan-title" onKeyDown={event => {
-      if (event.key === 'Escape') { event.preventDefault(); onClose(); }
-      if (event.key !== 'Tab') return;
-      const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
-      const first = buttons[0], last = buttons[buttons.length - 1];
-      if (!first) return;
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }}>
-      <header><div><h2 id="camera-scan-title">Scan with camera</h2><p>{modelLabel}</p></div><button className="icon-button" onClick={onClose} aria-label="Close camera scanner"><X size={20} /></button></header>
-      <div className="camera-scan-preview"><video ref={video} autoPlay muted playsInline aria-label="Live camera scanning preview" />{!ready && !error && <p role="status">Starting camera...</p>}</div>
-      <p className="muted">Keep the entire part in view with even lighting. Capture runs the inspection pipeline and saves the result to history.</p>
+  async function nativeScan(file: File | undefined) {
+    if (!file || submitting.current) return;
+    submitting.current = true; setBusy(true); setError('');
+    const controller = new AbortController(); request.current = controller;
+    try { await onScan(file, controller.signal); }
+    catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Camera inspection failed.'); }
+    finally { submitting.current = false; if (!controller.signal.aborted) setBusy(false); }
+  }
+
+  return <Dialog.Root open onOpenChange={open => { if (!open) onClose(); }}><Dialog.Portal>
+    <Dialog.Overlay className="workspace-overlay camera-dialog-overlay" />
+    <Dialog.Content className="camera-scan-dialog" onOpenAutoFocus={() => { previousFocus.current = document.activeElement as HTMLElement | null; }} onCloseAutoFocus={event => { event.preventDefault(); previousFocus.current?.focus(); }}>
+      <header><div><Dialog.Title id="camera-scan-title">Scan with camera</Dialog.Title><p>{modelLabel}</p></div><Dialog.Close asChild><button className="icon-button" aria-label="Close camera scanner"><X size={20} /></button></Dialog.Close></header>
+      <div className="camera-scan-preview" style={{ aspectRatio }}><video ref={video} autoPlay muted playsInline onLoadedMetadata={event => { const preview = event.currentTarget; if (preview.videoWidth && preview.videoHeight) setAspectRatio(preview.videoWidth / preview.videoHeight); }} style={{ transform: facing === 'user' ? 'scaleX(-1)' : undefined }} aria-label="Live camera scanning preview" />{!ready && !error && <p role="status">Starting camera...</p>}<div className="capture-guides" aria-hidden="true"><i /><i /><i /><i /></div><span className="camera-live-tag">{busy ? 'Inspecting' : ready ? 'Live preview' : 'Camera setup'}</span></div>
+      <Dialog.Description className="muted">Keep the whole part inside the frame, with even lighting. Your capture runs the inspection pipeline and saves its evidence.</Dialog.Description>
       {error && <p className="inference-error" role="alert">{error}</p>}
       <footer><button onClick={() => setFacing(value => value === 'environment' ? 'user' : 'environment')} disabled={busy}><RefreshCw size={16} /> Switch camera</button><button className="primary" disabled={!ready || busy} onClick={() => void scan()}><Camera size={17} />{busy ? 'Inspecting capture...' : 'Capture and inspect'}</button></footer>
-    </div>
-  </div>;
+      <label className={`native-camera file-button${busy ? ' disabled' : ''}`}><Camera size={16} /> Use the phone camera app<input type="file" accept="image/jpeg,image/png" capture="environment" disabled={busy} onChange={event => { void nativeScan(event.target.files?.[0]); event.target.value = ''; }} /></label>
+    </Dialog.Content>
+  </Dialog.Portal></Dialog.Root>;
 }

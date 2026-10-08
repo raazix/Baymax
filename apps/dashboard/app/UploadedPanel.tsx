@@ -63,7 +63,7 @@ export default function UploadedPanel({ inspection }: { inspection: UploadedInsp
 
   return <>
     <div className="panel-heading"><h2>{context?.input_source === 'camera' ? 'Camera inspection' : 'Component inspection'}</h2><span>{casting ? 'PatchCore' : 'YOLO11n'}</span></div>
-    <p className="muted">Shape hint: {context?.part_shape_hint === 'disc_like_round_outline' ? 'round-disc-like outline' : 'flat surface or unresolved outline'} ? geometric cue only</p>
+    <p className="muted">Shape hint: {context?.part_shape_hint === 'disc_like_round_outline' ? 'round-disc-like outline' : 'flat surface or unresolved outline'} / geometric cue only</p>
     <InspectionImage src={inspection.image_url} defects={defects} anomaly={anomaly} geometry={geometry} markers={markers} alt={top ? `Uploaded image with ${defects.length} model finding${defects.length === 1 ? '' : 's'}` : 'Uploaded image with no model findings'} />
     <div className={`finding${anomaly?.flagged || top ? ' flagged' : ''}`}><h3>{heading}</h3>{top && <span className={`status ${top.severity.level}`}>{human(top.severity.level)}</span>}</div><p className="muted">Proxy result / not brake-disc validated</p><details className="evidence-disclosure"><summary>Measurement & model details</summary><p>{explanation}</p><p className="muted">{modelName}</p>
     {quality.passed && (top || anomaly) && <dl className="measurements">

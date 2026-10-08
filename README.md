@@ -21,6 +21,16 @@ npm.cmd run dev
 
 Open http://localhost:3000. API documentation: http://127.0.0.1:8000/docs. Next.js proxies `/api` to FastAPI; set `BACKEND_URL` in the dashboard environment if needed. This scaffold is intended for a local demo. Engineer names are recorded assertions, not authenticated identities.
 
+## Phone demo
+
+Use **Connect phone** in the dashboard for QR pairing. To start the temporary protected HTTPS workspace:
+
+```powershell
+powershell -File scripts/start_phone_demo.ps1
+```
+
+Open the printed link on the phone, enter its pairing code, then use **Scan** or **Show live line**. Keep the laptop and FastAPI running. Stop with `powershell -File scripts/stop_phone_demo.ps1`. See [mobile UI, animation and verification](docs/MOBILE_UI.md).
+
 ## Demo walkthrough
 
 1. Click **Demonstrate critical defect** in the production lifecycle scene (explicitly synthetic replay). Inspect highlighted synthetic geometry, dimensions, severity, telemetry, trained synthetic RCA explanation and simulated future risk.

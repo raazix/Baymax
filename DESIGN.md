@@ -10,3 +10,9 @@ Shared radii: 16px working panels, 12px media and stage controls, 10px inputs/na
 
 ## Evidence disclosure
 The initial inspection view prioritizes the uploaded image, finding, probable cause, simulated risk and action. Settings, pipeline, measurements, process explanations, forecast details, model readiness and history expand on demand using native details controls. Proxy and synthetic status remain visible.
+
+## Responsive workspace and motion (2026-10-09)
+
+Keep the established industrial identity. The desktop reading path is image -> cause -> forecast/action, with the latter two grouped in one supporting column. The production scene is a compact disclosure, expanding automatically for a critical hold. Mobile uses a stacked evidence path and fixed bottom navigation with a primary scan control; extra tools use a focus-contained sheet. Camera preview respects the sensor aspect ratio.
+
+Motion expresses state: shared navigation selection, forecast value changes, saved/processing/error notifications and the critical production hold. Routine transitions take about 150-300 ms. Heavy 3D loads on demand, runs at a reduced phone budget, pauses offscreen/hidden, and respects reduced motion. No automatic scroll-reveal choreography blocks evidence or controls. Pairing uses a temporary HTTPS QR link with a code gate.
