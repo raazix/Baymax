@@ -43,8 +43,8 @@ export default function InspectionImage({ src, defects, anomaly, geometry, marke
     </div>}
     <div className="overlay-row">
       {hasModelLayer && <label className="overlay-toggle"><input type="checkbox" checked={overlay} onChange={e => setOverlay(e.target.checked)} /> Show model overlay</label>}
-      {anomaly && <span className="heat-legend" aria-hidden="true"><i className="heat-scale" />near threshold → above threshold · ring = most anomalous patch</span>}
-      {geometry && <span className="heat-legend" aria-hidden="true"><i className="rim-key" />fitted part outline · + centre · ray = finding position</span>}
+      {anomaly && <span className="heat-legend" aria-hidden="true"><i className="heat-scale" />low to high anomaly</span>}
+      {geometry && <span className="heat-legend" aria-hidden="true"><i className="rim-key" />outline / centre / position</span>}
     </div>
   </div>;
 }

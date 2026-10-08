@@ -172,3 +172,7 @@ All six MPDD component proxy models appear under Component anomaly (PatchCore) >
 
 ## Rounded dashboard refinement
 Updated shared CSS radii, inset graphite navigation, spacing, inputs, evidence tables and mobile control stacking. Next.js production build passes. Desktop screenshot with live MPDD inspection reviewed; screenshots remain in data/browser-check/rounded-ui (ignored by Git). Mobile screenshots captured with Chrome CLI, whose window-size capture may clip at minimum browser width; exact device emulation unavailable in this session. No backend/model changes.
+
+
+## Cleaner decision console
+Default view shows image/finding, cause hypothesis, simulated risk and action. Native keyboard-accessible details controls preserve pipeline evidence, measurement notes, telemetry/TreeSHAP, forecast intervals, full recommendation, model status and history. Settings retain process preset/diameter and matching-component warnings. Pipeline jumps open relevant evidence. No LLM added: analytics/briefing.py already provides a deterministic evidence packet for an optional grounded explanation layer. SAHI is listed in requirements-ml.txt but not wired into YOLO inference; PatchCore uses local overlapping square crops only. Build/TypeScript pass.

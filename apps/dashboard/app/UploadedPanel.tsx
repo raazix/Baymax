@@ -62,9 +62,9 @@ export default function UploadedPanel({ inspection }: { inspection: UploadedInsp
     : null;
 
   return <>
-    <div className="panel-heading"><h2>Component inspection</h2><span>{modelName}</span></div>
+    <div className="panel-heading"><h2>Component inspection</h2><span>{casting ? 'PatchCore' : 'YOLO11n'}</span></div>
     <InspectionImage src={inspection.image_url} defects={defects} anomaly={anomaly} geometry={geometry} markers={markers} alt={top ? `Uploaded image with ${defects.length} model finding${defects.length === 1 ? '' : 's'}` : 'Uploaded image with no model findings'} />
-    <div className={`finding${anomaly?.flagged || top ? ' flagged' : ''}`}><h3>{heading}</h3><p>{explanation}</p></div>
+    <div className={`finding${anomaly?.flagged || top ? ' flagged' : ''}`}><h3>{heading}</h3>{top && <span className={`status ${top.severity.level}`}>{human(top.severity.level)}</span>}</div><p className="muted">Proxy result / not brake-disc validated</p><details className="evidence-disclosure"><summary>Measurement & model details</summary><p>{explanation}</p><p className="muted">{modelName}</p>
     {quality.passed && (top || anomaly) && <dl className="measurements">
       {casting && anomaly && <>
         <div><dt>Anomaly score</dt><dd className={anomaly.flagged ? 'over' : 'under'}>{anomaly.score.toFixed(3)} <span className="dd-sub">threshold {anomaly.threshold.toFixed(3)}</span></dd></div>
@@ -81,6 +81,6 @@ export default function UploadedPanel({ inspection }: { inspection: UploadedInsp
       {geometry ? 'The dashed outline is the part edge fitted from the image; R is the distance from the centre to that edge, 0° points right and angles run counter-clockwise. ' : casting ? 'The part outline could not be located reliably in this image, so no radial position is given. ' : ''}
       {scaled ? `Millimetres use ${calibration?.source}. ` : 'Enter the part’s real diameter above the image to convert pixels to millimetres. '}
       Proxy model, not brake-disc validated; severity comes from fixed rules on defect class, never model confidence.{quality.profile_note ? ` ${quality.profile_note}` : ''}
-    </p>
+    </p></details>
   </>;
 }

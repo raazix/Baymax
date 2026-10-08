@@ -7,3 +7,6 @@ Operate mode: choose a replay, inspect the component and evidence, review risk/a
 
 ## Rounded workspace refinement
 Shared radii: 16px working panels, 12px media and stage controls, 10px inputs/navigation, 8px compact status labels. Graphite sidebar is inset on the pale canvas. Keep border-defined surfaces, readable evidence tables, and teal actions; mobile controls stack with generous touch targets.
+
+## Evidence disclosure
+The initial inspection view prioritizes the uploaded image, finding, probable cause, simulated risk and action. Settings, pipeline, measurements, process explanations, forecast details, model readiness and history expand on demand using native details controls. Proxy and synthetic status remain visible.
