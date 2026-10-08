@@ -31,7 +31,7 @@ function polarToWorld(r: number, thetaDeg: number, lift = 0) {
   return new THREE.Vector3(r * Math.cos(t), surfaceY(r) + lift, r * Math.sin(t));
 }
 
-function buildRotor() {
+export function buildRotor() {
   const group = new THREE.Group();
   const profile = [[135, 22], [135, 0], [88, 0], [56, 10], [48, 26], [26, 26], [26, 34], [48, 34], [56, 22], [135, 22]]
     .map(([r, y]) => new THREE.Vector2(r, y));
@@ -81,7 +81,7 @@ function buildZones() {
 
 // Project image-space PatchCore distances onto the procedural rotor as a visual aid.
 // This deliberately does not claim image-to-part registration or pixel segmentation.
-function buildHeatmap(heatmap: RotorHeatmap) {
+export function buildHeatmap(heatmap: RotorHeatmap) {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
