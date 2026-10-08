@@ -19,9 +19,48 @@ from vision.yolo_detector import ProxyDetector, ModelUnavailable
 from vision.patchcore_anomaly import PatchCoreDetector, PatchCoreUnavailable
 from vision import patchcore_custom
 from analytics.briefing import evidence_packet
+from analytics import assistant
+from pydantic import BaseModel, ConfigDict, Field
 from analytics.service import analyze as analyze_process, status as analytics_status, model_versions as analytics_versions, AnalyticsUnavailable
 
 app = FastAPI(title='LineGuard', version='0.1.0', description='Evidence-linked Track 3 hackathon scaffold')
+
+class AssistantQuestion(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    question: str = Field(default='Explain this inspection and the recommended next action.', min_length=1, max_length=1200)
+
+@app.exception_handler(assistant.AssistantUnavailable)
+async def assistant_error(request, error):
+    return JSONResponse({'detail': str(error)}, status_code=error.status)
+
+@app.get('/api/assistant/status')
+def assistant_status():
+    return assistant.status()
+
+@app.post('/api/inspections/{identifier}/assistant')
+async def inspection_assistant(identifier: str, question: AssistantQuestion):
+    record = await run_in_threadpool(inspection, identifier)
+    return await assistant.explain(record, question.question.strip())
+
+@app.get('/api/assistant/responses/{identifier}')
+def assistant_response(identifier: str):
+    return assistant.public_record(assistant.read_record(identifier))
+
+@app.post('/api/assistant/responses/{identifier}/speech')
+async def assistant_speech(identifier: str):
+    record = await run_in_threadpool(assistant.read_record, identifier)
+    audio = await assistant.speech(record)
+    return Response(audio, media_type='audio/mpeg', headers={'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff'})
+
+@app.post('/api/assistant/transcribe')
+async def assistant_transcribe(request: Request):
+    content = bytearray()
+    async for chunk in request.stream():
+        if len(content) + len(chunk) > assistant.MAX_AUDIO_BYTES:
+            raise HTTPException(413, 'Audio exceeds 10 MiB limit')
+        content.extend(chunk)
+    media_type = request.headers.get('content-type', '').split(';', 1)[0].lower()
+    return await assistant.transcribe(bytes(content), media_type)
 repo = Repository()
 proxy_detector = ProxyDetector()
 patchcore_detector = PatchCoreDetector()

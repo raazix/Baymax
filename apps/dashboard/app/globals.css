@@ -181,3 +181,16 @@ details[open]>summary { margin-bottom:14px; }
   .settings-fields { grid-template-columns:1fr; }
   .sidebar-details { display:none; }
 }
+
+.inspection-assistant { margin-top:20px; }
+.inspection-assistant h2 { display:flex; align-items:center; gap:9px; }
+.inspection-assistant form { margin-top:12px; }
+.assistant-input { display:flex; gap:8px; }
+.assistant-input input { flex:1; min-width:0; }
+.assistant-input button { display:flex; align-items:center; justify-content:center; }
+.assistant-answer { border-top:1px solid var(--line); padding-top:16px; margin-top:16px; }
+.assistant-answer>p { max-width:75ch; white-space:pre-wrap; }
+.assistant-sources { display:flex; align-items:center; flex-wrap:wrap; gap:14px; font-size:12px; }
+.assistant-sources button { display:flex; align-items:center; gap:6px; margin-left:auto; }
+.inspection-assistant audio { width:100%; margin-top:16px; }
+@media(max-width:720px) { .assistant-input { flex-wrap:wrap; } .assistant-input input { flex-basis:calc(100% - 58px); } .assistant-input .primary { width:100%; } }
