@@ -1,0 +1,73 @@
+{
+  "name": "bottle",
+  "created_at": "2026-10-08T15:52:27Z",
+  "threshold": 3.758687210083008,
+  "train_images": 18,
+  "heldout_images": 5,
+  "bank_patches": 1024,
+  "heldout_scores": [
+    2.7263,
+    2.466,
+    3.417,
+    3.181,
+    3.3174
+  ],
+  "heldout_score_max": 3.417,
+  "heldout_score_mean": 3.0215,
+  "threshold_margin": 1.1,
+  "artifact_sha256": "ca0990080088bc9d403a1f971b1ec6afb73fe748401f8bd152a0f3a56e1d0889",
+  "seconds": 6.2,
+  "metadata": {
+    "method": "compact_patchcore_resnet18",
+    "data_source": "custom_normal_images",
+    "brake_disc_validated": false,
+    "custom_name": "bottle",
+    "seed": 42,
+    "training_normal_images": 18,
+    "training_defect_images": 0,
+    "heldout_normal_images": 5,
+    "train_sha256": [
+      "04cd9aa14a23ce870785cb3fd7cfdec59cc9513ff599ee406c60faf19d50886f",
+      "0b98f1112f9f9a3733332a24a573cfb1cf8cea33781d72208ed178d9ef1690f6",
+      "21d7f58c16ce14eab90b43de23e5c926e678738236c30bcb2742821697562df9",
+      "23e3ba13bd39c4fc0b3f3dfe1f535fc4ac5f065b3c76903caf2298162c982d73",
+      "5f573891e33ce227c93588deb89556ebad3d63436610be2fb3b6474415f22a68",
+      "714684948c0f29323f9861df9ea8906b329559deeec22d7d67ed993d5f9d8f4b",
+      "770d09de6f3080bf73f77a5d72642aacfb179c1e4f3c47a48eb48aa7b1144239",
+      "790364ef4cf662987ed42e65c3beb139219425447562c19ec0660f9248c5b0a4",
+      "8846b5de010e0f43689108fd1d638165847a639866bcae60c7c3ffa09532b4ab",
+      "8b190806402c416050c1feaeb9d5c522ce9da73e79dcf1b22e717cb98a48a87f",
+      "8cc34fdef3681dcc38ba9717069d97ee0e19802d6039d6966f9b211bd1b988b4",
+      "b6e7782f4044bc2fa1617158afc787f150ebdc0effa019842f26dc111cebe6d2",
+      "be4465532513c914f5a46b03cd072c8492ff222b24b282a3bf64650bdf137022",
+      "c07ae771659722ca019b49b44e1b2af800f0c210d9cdf06abbd903a1e3416395",
+      "c5f271941ed04db0d6b2ae6ed70310243fe76e7eb09311de240246df1329a17e",
+      "cffe1c8d20e8c8d7acc39b5794f03e50905512cdca1b8084e9ae518137d65a3e",
+      "ebeb17c1e40e3e2d3bd002d9ecccaf39e875b0bbbe6382c784e041e998caba72",
+      "fc0ec5bbbc69e078b2cabdd584af203328859a121ab98b9685593b579b582e0a"
+    ],
+    "heldout_sha256": [
+      "00f0e2db8c6e623b6de15371158d2bd1173e97ba760edfa23d79ba9358a1b74c",
+      "38571df47d35bd790425e1f623ae4606ac51700f0ef13304bda5c09b4d3790c0",
+      "7e0823ebbbdbfc09139ac0582496096bb99962057ff9c03aecebf1654bb057ef",
+      "b832c6eb8dc838b0f78eb7a65acf4edb633101d460b1b42aa0fc6b9e27d477a7",
+      "e71fa281f1255eda3a7890334e9ecbc9b106ab6e57fb17c8e14270ac34b9c983"
+    ],
+    "coreset": {
+      "method": "approximate greedy farthest-point random projection",
+      "seed": 42,
+      "input_patches": 28224,
+      "candidate_patches": 28224,
+      "candidate_limit": 50000,
+      "candidate_pool_subsampled": false,
+      "projection_dim": 64,
+      "selected_patches": 1024,
+      "projection_max_squared_covering_distance": 3.301980495452881,
+      "approximation": "Seeded random candidate subsampling when needed, then Gaussian projected-space greedy selection; original embeddings retained."
+    },
+    "threshold": 3.758687210083008,
+    "threshold_selection": "Maximum held-out NORMAL score x 1.1. No defect images were used.",
+    "image_score": "Maximum nearest normal-patch Euclidean distance over square crops",
+    "limitations": "Few-shot, normal-only model for one casting. False-alarm rate is estimated from a small held-out sample and detection of real defects is unmeasured. Scores are not probabilities."
+  }
+}

@@ -1,0 +1,13 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: lineguard
+      POSTGRES_USER: lineguard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-demo-only}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - lineguard_db:/var/lib/postgresql/data
+volumes:
+  lineguard_db:

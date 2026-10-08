@@ -1,0 +1,144 @@
+{
+  "model_id": "synthetic-process-rca-v1",
+  "dataset_status": "synthetic",
+  "created_at": "2026-10-08T13:43:48.799849+00:00",
+  "seed": 42,
+  "classes": [
+    "nominal_process",
+    "thermal_process_drift",
+    "pressure_instability",
+    "tooling_vibration",
+    "speed_drift"
+  ],
+  "features": [
+    "temperature_c",
+    "pressure_bar",
+    "vibration_mm_s",
+    "machine_speed_rpm"
+  ],
+  "model_sha256": "8c5384fa027cd0c745407fceedcbaec84fce4f225853ac8b0896a8917d9778c3",
+  "dataset_sha256": "bf0ee9d0c6a78419c6056b56531464a3296708f8d938e60a553b26768b9003ea",
+  "split": {
+    "method": "chronological, whole lots",
+    "train_lots": [
+      0,
+      399
+    ],
+    "test_lots": [
+      400,
+      499
+    ],
+    "train_rows": 4800,
+    "test_rows": 1200
+  },
+  "training_feature_ranges": {
+    "temperature_c": [
+      669.7404377049877,
+      785.1888109087639
+    ],
+    "pressure_bar": [
+      60.1502652228723,
+      122.2016898048446
+    ],
+    "vibration_mm_s": [
+      0.06124051451588952,
+      7.098026720007633
+    ],
+    "machine_speed_rpm": [
+      954.3158368954857,
+      1693.0865899445666
+    ]
+  },
+  "metrics": {
+    "accuracy": 0.97,
+    "log_loss": 0.09197962188675265,
+    "classification_report": {
+      "nominal_process": {
+        "precision": 0.956140350877193,
+        "recall": 0.9083333333333333,
+        "f1-score": 0.9316239316239316,
+        "support": 240.0
+      },
+      "thermal_process_drift": {
+        "precision": 0.9547511312217195,
+        "recall": 0.9768518518518519,
+        "f1-score": 0.965675057208238,
+        "support": 216.0
+      },
+      "pressure_instability": {
+        "precision": 0.9512195121951219,
+        "recall": 0.975,
+        "f1-score": 0.9629629629629629,
+        "support": 240.0
+      },
+      "tooling_vibration": {
+        "precision": 1.0,
+        "recall": 0.9875,
+        "f1-score": 0.9937106918238994,
+        "support": 240.0
+      },
+      "speed_drift": {
+        "precision": 0.9850746268656716,
+        "recall": 1.0,
+        "f1-score": 0.9924812030075187,
+        "support": 264.0
+      },
+      "accuracy": 0.97,
+      "macro avg": {
+        "precision": 0.9694371242319411,
+        "recall": 0.9695370370370371,
+        "f1-score": 0.9692907693253101,
+        "support": 1200.0
+      },
+      "weighted avg": {
+        "precision": 0.9700435941448203,
+        "recall": 0.97,
+        "f1-score": 0.9698268922412958,
+        "support": 1200.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        218,
+        10,
+        11,
+        0,
+        1
+      ],
+      [
+        4,
+        211,
+        1,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        234,
+        0,
+        3
+      ],
+      [
+        3,
+        0,
+        0,
+        237,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        264
+      ]
+    ]
+  },
+  "limitations": [
+    "Labels are sampled latent synthetic process scenarios, not diagnosed production failures.",
+    "No brake-disc or real-production validation.",
+    "Probabilities are uncalibrated.",
+    "Spatial fingerprint features are not included; future training requires paired production evidence."
+  ]
+}

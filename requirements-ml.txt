@@ -1,0 +1,7 @@
+-r requirements.txt
+ultralytics>=8.3,<8.4
+sahi>=0.11,<1
+scikit-learn>=1.5,<2
+xgboost>=2.1,<4
+shap>=0.46,<1
+anomalib>=2,<3

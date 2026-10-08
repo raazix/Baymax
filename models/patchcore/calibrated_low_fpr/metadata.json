@@ -1,0 +1,98 @@
+{
+  "method": "compact_patchcore_resnet18",
+  "data_source": "casting_proxy",
+  "brake_disc_validated": false,
+  "seed": 42,
+  "training_normal_images": 363,
+  "training_defect_images": 0,
+  "manifest_sha256": "959797cc12d6e44cf114d2c50eadf7fb1da032ec986488255b565bfcc8f4a05f",
+  "split_counts": {
+    "train": {
+      "normal": 363,
+      "defect": 0
+    },
+    "validation": {
+      "normal": 78,
+      "defect": 390
+    },
+    "test": {
+      "normal": 78,
+      "defect": 391
+    }
+  },
+  "physical_part_ids_available": false,
+  "near_duplicate_check_performed": false,
+  "coreset": {
+    "method": "approximate greedy farthest-point random projection",
+    "seed": 42,
+    "input_patches": 284592,
+    "candidate_patches": 50000,
+    "candidate_limit": 50000,
+    "candidate_pool_subsampled": true,
+    "projection_dim": 64,
+    "selected_patches": 1024,
+    "projection_max_squared_covering_distance": 4.071417808532715,
+    "approximation": "Seeded random candidate subsampling when needed, then Gaussian projected-space greedy selection; original embeddings retained."
+  },
+  "threshold_selection": {
+    "model_version": "casting-patchcore-validation-low-fpr-v1",
+    "objective_predeclared": "Lowest positive strict score>threshold meeting validation-normal FPR budget; maximizes recall under this budget.",
+    "target_validation_normal_fpr": 0.05,
+    "engineering_demo_target_only": true,
+    "production_approved": false,
+    "threshold": 2.322272300720215,
+    "selection_split": "validation",
+    "test_used_for_selection": false,
+    "validation": {
+      "normal_images": 78,
+      "defect_images": 390,
+      "false_positives": 3,
+      "false_negatives": 83,
+      "fpr": 0.038461538461538464,
+      "recall": 0.7871794871794872,
+      "precision": 0.9903225806451613,
+      "confusion_matrix": [
+        [
+          75,
+          3
+        ],
+        [
+          83,
+          307
+        ]
+      ],
+      "order": "rows actual normal/defect, columns predicted normal/defect"
+    },
+    "original_validation": {
+      "normal_images": 78,
+      "defect_images": 390,
+      "false_positives": 32,
+      "false_negatives": 8,
+      "fpr": 0.41025641025641024,
+      "recall": 0.9794871794871794,
+      "precision": 0.9227053140096618,
+      "confusion_matrix": [
+        [
+          46,
+          32
+        ],
+        [
+          8,
+          382
+        ]
+      ],
+      "order": "rows actual normal/defect, columns predicted normal/defect"
+    },
+    "source_artifact_sha256": "492ac07823a95b40289d9e62717872e1d613200ea2c3ec628c29ecbb185e1b56",
+    "source_evaluation_sha256": "d6c290090f93a264b700f917281a4a7f1f5b27026493feeed03555a364bc4803",
+    "source_manifest_sha256": "959797cc12d6e44cf114d2c50eadf7fb1da032ec986488255b565bfcc8f4a05f",
+    "bank_tensor_sha256": "22b74949a9038d7a69ec4eae11bfd3077338e9aa4339ca1b4c45f0464942aef0",
+    "validation_records_sha256": "87b776f1ac370856c505f37595e93ffe807cc10169f858ab9f2f948a4db4e798",
+    "limitation": "Observed validation FPR is not a population guarantee; existing test is a reused benchmark, not a new blind holdout."
+  },
+  "threshold": 2.322272300720215,
+  "image_score": "Maximum nearest normal-patch Euclidean distance",
+  "feature_pipeline": "Frozen official ImageNet ResNet18 layer2+layer3 pooled features, 224x224 uncropped RGB normalization; shared runtime extractor",
+  "limitations": "Casting proxy only; no pixel masks or defect-class-specific unknown anomaly validation. Scores are not probabilities; physical-part split leakage cannot be excluded.",
+  "model_version": "casting-patchcore-validation-low-fpr-v1"
+}

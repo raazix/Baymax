@@ -1,0 +1,41 @@
+{
+  "method": "compact_patchcore_resnet18",
+  "data_source": "mpdd_proxy",
+  "category": "metal_plate",
+  "model_version": "mpdd-normal-patchcore-v1",
+  "brake_disc_validated": false,
+  "production_validated": false,
+  "seed": 42,
+  "manifest_sha256": "806950bf0016b13f4b2646a24dd9197b0a1964fd7c22490073ba2403506c5a1a",
+  "training_normal_images": 43,
+  "training_defect_images": 0,
+  "training_crops": 43,
+  "coreset": {
+    "method": "approximate greedy farthest-point random projection",
+    "seed": 42,
+    "input_patches": 33712,
+    "candidate_patches": 33712,
+    "candidate_limit": 50000,
+    "candidate_pool_subsampled": false,
+    "projection_dim": 64,
+    "selected_patches": 1024,
+    "projection_max_squared_covering_distance": 2.629584550857544,
+    "approximation": "Seeded random candidate subsampling when needed, then Gaussian projected-space greedy selection; original embeddings retained."
+  },
+  "threshold": 3.0271496772766113,
+  "threshold_selection": {
+    "split": "validation_normal_only",
+    "target_normal_fpr": 0.05,
+    "selection": "Lowest positive threshold with floor(N*.05) allowed validation-normal alarms; strict score > threshold.",
+    "normal_images": 11,
+    "false_positives": 0,
+    "observed_normal_fpr": 0.0,
+    "test_used_for_selection": false,
+    "population_fpr_guaranteed": false,
+    "production_approved": false
+  },
+  "feature_pipeline": "Shared frozen ImageNet ResNet18 pooled layer2/layer3; square_crops for nonsquare images; uncropped resize224 per crop; image score max patch distance across crops.",
+  "limitations": "MPDD component proxy; separate bank per category; no brake-disc/production validation. Small normal calibration samples cannot guarantee population FPR. Near-duplicate/physical-part leakage not excluded.",
+  "pixel_metrics": "Not evaluated; genuine masks retained and hashed, but no pixel performance or physical metrology claimed.",
+  "artifact_sha256": "e4dd650a46f487a7cb6e48df2a16f00c42a5d67bb6ec34af9ca51ca1e9661b09"
+}

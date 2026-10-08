@@ -1,0 +1,10 @@
+{
+  "weights": "models/patchcore/calibrated_low_fpr/casting_proxy.pt",
+  "weights_sha256": "2e737624006144655e604614d8f8e2c0e78ec9d732d76cfb671150c6ab9e5ebd",
+  "evaluation": "models/patchcore/calibrated_low_fpr/evaluation.json",
+  "device": "0",
+  "scope": "casting proxy; validation-selected low false-alarm operating point",
+  "target_validation_normal_fpr": 0.05,
+  "brake_disc_validated": false,
+  "production_validated": false
+}

@@ -1,0 +1,41 @@
+{
+  "method": "compact_patchcore_resnet18",
+  "data_source": "mpdd_proxy",
+  "category": "tubes",
+  "model_version": "mpdd-normal-patchcore-v1",
+  "brake_disc_validated": false,
+  "production_validated": false,
+  "seed": 42,
+  "manifest_sha256": "806950bf0016b13f4b2646a24dd9197b0a1964fd7c22490073ba2403506c5a1a",
+  "training_normal_images": 98,
+  "training_defect_images": 0,
+  "training_crops": 98,
+  "coreset": {
+    "method": "approximate greedy farthest-point random projection",
+    "seed": 42,
+    "input_patches": 76832,
+    "candidate_patches": 50000,
+    "candidate_limit": 50000,
+    "candidate_pool_subsampled": true,
+    "projection_dim": 64,
+    "selected_patches": 1024,
+    "projection_max_squared_covering_distance": 5.670865058898926,
+    "approximation": "Seeded random candidate subsampling when needed, then Gaussian projected-space greedy selection; original embeddings retained."
+  },
+  "threshold": 2.939131259918213,
+  "threshold_selection": {
+    "split": "validation_normal_only",
+    "target_normal_fpr": 0.05,
+    "selection": "Lowest positive threshold with floor(N*.05) allowed validation-normal alarms; strict score > threshold.",
+    "normal_images": 24,
+    "false_positives": 1,
+    "observed_normal_fpr": 0.041666666666666664,
+    "test_used_for_selection": false,
+    "population_fpr_guaranteed": false,
+    "production_approved": false
+  },
+  "feature_pipeline": "Shared frozen ImageNet ResNet18 pooled layer2/layer3; square_crops for nonsquare images; uncropped resize224 per crop; image score max patch distance across crops.",
+  "limitations": "MPDD component proxy; separate bank per category; no brake-disc/production validation. Small normal calibration samples cannot guarantee population FPR. Near-duplicate/physical-part leakage not excluded.",
+  "pixel_metrics": "Not evaluated; genuine masks retained and hashed, but no pixel performance or physical metrology claimed.",
+  "artifact_sha256": "3a3bb881d8387bd512178aa857c8c73252cbe664d2c87a852fa6fd1b60a05fca"
+}

@@ -1,0 +1,9 @@
+{
+  "weights": "models/yolo/neu_yolo11n_rebalanced/weights/best.pt",
+  "weights_sha256": "1ee2e1428f35009ff097b8167085b76bc32d54adf6067c206eb7fa86caa537f8",
+  "evaluation": "models/yolo/neu_yolo11n_rebalanced/evaluation.json",
+  "evaluation_split": "val",
+  "device": "0",
+  "scope": "NEU steel-surface detection proxy",
+  "brake_disc_validated": false
+}

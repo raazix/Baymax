@@ -1,0 +1,78 @@
+{
+  "task": "detect",
+  "dataset": "D:\\baymax\\data\\processed\\neu-det\\dataset.yaml",
+  "evaluation_split": "test",
+  "metrics": {
+    "metrics/precision(B)": 0.6765198516903355,
+    "metrics/recall(B)": 0.7096701886546476,
+    "metrics/mAP50(B)": 0.7237143811620733,
+    "metrics/mAP50-95(B)": 0.4243284939370371,
+    "fitness": 0.4243284939370371
+  },
+  "per_class": [
+    {
+      "class": "crazing",
+      "precision": 0.5005740170598421,
+      "recall": 0.2803738317757009,
+      "mAP50": 0.3459704038197715,
+      "mAP50_95": 0.13873750110349342
+    },
+    {
+      "class": "inclusion",
+      "precision": 0.6412582877402394,
+      "recall": 0.7898089171974523,
+      "mAP50": 0.7442314367863818,
+      "mAP50_95": 0.3913795011914791
+    },
+    {
+      "class": "patches",
+      "precision": 0.7541701361518099,
+      "recall": 0.8380281690140845,
+      "mAP50": 0.8578540891666403,
+      "mAP50_95": 0.5509374302059198
+    },
+    {
+      "class": "pitted_surface",
+      "precision": 0.9216143352856468,
+      "recall": 0.7936507936507936,
+      "mAP50": 0.8633734432854661,
+      "mAP50_95": 0.5827916786800929
+    },
+    {
+      "class": "rolled-in_scale",
+      "precision": 0.6066637153740246,
+      "recall": 0.5978260869565217,
+      "mAP50": 0.6031833970482712,
+      "mAP50_95": 0.31993655339501365
+    },
+    {
+      "class": "scratches",
+      "precision": 0.6348386185304495,
+      "recall": 0.9583333333333334,
+      "mAP50": 0.9276735168659092,
+      "mAP50_95": 0.562188299046224
+    }
+  ],
+  "weights": "D:\\baymax\\models\\yolo\\neu_yolo11n_rebalanced\\weights\\best.pt",
+  "weights_sha256": "1ee2e1428f35009ff097b8167085b76bc32d54adf6067c206eb7fa86caa537f8",
+  "dataset_manifest_sha256": "71170ab5ac64d72e6257d99a319e8c883d7bea7d7a9ed09a0986c981f98016b9",
+  "seed": 42,
+  "completed_epochs": 12,
+  "evaluation_elapsed_seconds": 4.44,
+  "training_process_elapsed_seconds": null,
+  "torch": "2.6.0+cu126",
+  "ultralytics": "8.3.253",
+  "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+  "test_inference_speed_ms_per_image": {
+    "preprocess": 0.33734074074379383,
+    "inference": 3.371274444437707,
+    "loss": 0.000593703705615351,
+    "postprocess": 0.6650492592598312
+  },
+  "brake_disc_validated": false,
+  "scope": "NEU steel-surface detection proxy",
+  "test_previously_used_for_baseline_reporting": true,
+  "fresh_blind_test": false,
+  "used_for_candidate_selection": false,
+  "limitation": "Image/hash-group holdout; physical part identities unavailable; not brake-disc performance."
+}

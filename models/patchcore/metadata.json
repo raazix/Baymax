@@ -1,0 +1,48 @@
+{
+  "method": "compact_patchcore_resnet18",
+  "data_source": "casting_proxy",
+  "brake_disc_validated": false,
+  "seed": 42,
+  "training_normal_images": 363,
+  "training_defect_images": 0,
+  "manifest_sha256": "959797cc12d6e44cf114d2c50eadf7fb1da032ec986488255b565bfcc8f4a05f",
+  "split_counts": {
+    "train": {
+      "normal": 363,
+      "defect": 0
+    },
+    "validation": {
+      "normal": 78,
+      "defect": 390
+    },
+    "test": {
+      "normal": 78,
+      "defect": 391
+    }
+  },
+  "physical_part_ids_available": false,
+  "near_duplicate_check_performed": false,
+  "coreset": {
+    "method": "approximate greedy farthest-point random projection",
+    "seed": 42,
+    "input_patches": 284592,
+    "candidate_patches": 50000,
+    "candidate_limit": 50000,
+    "candidate_pool_subsampled": true,
+    "projection_dim": 64,
+    "selected_patches": 1024,
+    "projection_max_squared_covering_distance": 4.071417808532715,
+    "approximation": "Seeded random candidate subsampling when needed, then Gaussian projected-space greedy selection; original embeddings retained."
+  },
+  "threshold_selection": {
+    "f1": 0.9502487562189055,
+    "precision": 0.9227053140096618,
+    "recall": 0.9794871794871794,
+    "selection": "Maximum validation F1; ties prefer precision, then larger threshold. Prediction is score > threshold."
+  },
+  "threshold": 2.156587839126587,
+  "image_score": "Maximum nearest normal-patch Euclidean distance",
+  "feature_pipeline": "Frozen official ImageNet ResNet18 layer2+layer3 pooled features, 224x224 uncropped RGB normalization; shared runtime extractor",
+  "limitations": "Casting proxy only; no pixel masks or defect-class-specific unknown anomaly validation. Scores are not probabilities; physical-part split leakage cannot be excluded.",
+  "artifact_sha256": "492ac07823a95b40289d9e62717872e1d613200ea2c3ec628c29ecbb185e1b56"
+}

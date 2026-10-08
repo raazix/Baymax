@@ -1,0 +1,21 @@
+{
+  "seed": 2026,
+  "source": "synthetic ordered lots; no production observations",
+  "target": "observed synthetic next-lot defective count / 250 parts",
+  "split": {
+    "train": 1078,
+    "calibration": 360,
+    "test": 360
+  },
+  "leakage_control": "Chronological split, no shuffle; scaler/components fitted only on training rows. Calibration residuals exclude test rows.",
+  "plsr": {
+    "test_mae": 0.06362468102169662,
+    "calibration_mae": 0.058316499056804895,
+    "persistence_baseline_test_mae": 0.0704
+  },
+  "pcr": {
+    "test_mae": 0.072885050210378,
+    "calibration_mae": 0.06290504410823791,
+    "persistence_baseline_test_mae": 0.0704
+  }
+}
