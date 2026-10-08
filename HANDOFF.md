@@ -184,3 +184,7 @@ Implemented read-only InspectionAssistant with text and microphone questions, tr
 
 ## SAHI backend completed
 SAHI0.12.8 installed without altering torch/ultralytics and pinned in requirements-ml.txt. Optional inference_mode=full/sliced on NEU proxy detection and upload endpoints; defaults full. tile_size128-2048 (default512), overlap0-.5 (default.2), max64tiles. Reuses verified loaded model; BGR->RGB; class-aware GREEDYNMM/IOS.5 with full-image pass. Settings saved in model-run and upload context. PatchCore untouched, SAHI+casting422. All91 tests pass; GPU4-tile smoke, both endpoints, saved evidence and valid audit passed (data/sahi-live-test.json). docs/SAHI.md includes usage/limitations. API PID30840/session3084/GPU0. Dashboard remains full-image mode; no accuracy gain or latency claim. This supersedes older SAHI-pending notes.
+
+
+## Dashboard SAHI selector
+Dashboard offers full-image (default) and SAHI sliced choices when YOLO11n selected. Tile sizes 256/384/512/768/1024, overlaps10-50%. Selected settings sent on raw-image inspection upload and shown in resulting part strip; calibration/settings collapse has tile-count warning. Follow-up images reuse original inference settings. Live localhost upload verified sliced with tile256/overlap.3, persisted model run and valid audit; an image that fit in one tile still records sliced mode. Production Next build and TypeScript pass. Test report data/dashboard-sahi-test.json.

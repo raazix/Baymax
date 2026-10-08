@@ -18,3 +18,7 @@ Model-run evidence stores mode, SAHI version, tile size/count, overlap, merge se
 Validation: 91 backend tests pass. Tests cover tile-coordinate shifts, merging same-class duplicates without merging distinct classes, BGR/RGB conversion, clipping and workload/input limits. GPU smoke test on one quality-passed 200x200 NEU image: four 128px tiles, three final detections; full mode also returned three. Both API endpoints and persisted evidence passed, inspection audit valid. Functional report: ignored data/sahi-live-test.json. This is functional evidence, not an accuracy benchmark.
 
 [SAHI source and documentation](https://github.com/obss/sahi).
+
+
+## Dashboard
+Select **Steel defects - YOLO11n**, then choose **SAHI sliced - small details** as YOLO inference. Open Inspection settings to choose tile size and overlap. Upload a NEU steel image. The saved inspection summary shows SAHI and tile count; detailed inference config is in the inspection context and model-run record. Follow-up verification reuses the original mode and tile settings. Dashboard full-image mode is the default.
