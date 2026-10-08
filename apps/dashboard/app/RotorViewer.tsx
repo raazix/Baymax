@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export type RotorDefect = { label: string; r_mm: number; theta_deg: number; equivalent_diameter_mm: number; zone: string; severity: { level: string } };
+export type RotorHeatmap = { grid: number[][]; threshold: number };
 
 const SEVERITY_COLOR: Record<string, number> = { critical: 0xd8342a, high: 0xe0672b, medium: 0xe0a82b, low: 0x3b7bb5 };
 const ZONES = [
@@ -78,6 +79,57 @@ function buildZones() {
   return group;
 }
 
+// Project image-space PatchCore distances onto the procedural rotor as a visual aid.
+// This deliberately does not claim image-to-part registration or pixel segmentation.
+function buildHeatmap(heatmap: RotorHeatmap) {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || heatmap.grid.length === 0 || heatmap.grid[0]?.length === 0) return null;
+  const values = heatmap.grid.flat();
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const belowRange = Math.max(heatmap.threshold - min, 1e-6);
+  const aboveRange = Math.max(max - heatmap.threshold, 1e-6);
+  const rows = heatmap.grid.length;
+  const cols = heatmap.grid[0].length;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+  ctx.clip();
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const value = heatmap.grid[row][col];
+      const aboveThreshold = value > heatmap.threshold;
+      const normalized = aboveThreshold
+        ? Math.min(1, (value - heatmap.threshold) / aboveRange)
+        : Math.min(1, Math.max(0, (value - min) / belowRange));
+      const hue = aboveThreshold ? 55 - normalized * 55 : 215 - normalized * 25;
+      const alpha = aboveThreshold ? 0.3 + normalized * 0.55 : 0.12 + normalized * 0.12;
+      ctx.fillStyle = `hsla(${hue}, 92%, 53%, ${alpha})`;
+      ctx.fillRect(col * size / cols, row * size / rows, size / cols + 1, size / rows + 1);
+    }
+  }
+  ctx.restore();
+  // Keep the modeled hub clear; this is a rotor-shaped projection for presentation.
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, (56 / OUTER_R) * size / 2, 0, Math.PI * 2);
+  ctx.fill();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(
+    new THREE.CircleGeometry(OUTER_R, 128),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }),
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = FACE_Y + 0.18;
+  mesh.userData.heatmapTexture = texture;
+  return mesh;
+}
+
 function buildMarker(defect: RotorDefect) {
   const color = SEVERITY_COLOR[defect.severity.level] ?? 0xd8342a;
   const group = new THREE.Group();
@@ -113,13 +165,15 @@ function disposeTree(root: THREE.Object3D) {
   });
 }
 
-export default function RotorViewer({ defects }: { defects: RotorDefect[] }) {
+export default function RotorViewer({ defects, heatmap }: { defects: RotorDefect[]; heatmap?: RotorHeatmap | null }) {
   const mount = useRef<HTMLDivElement>(null);
   const markers = useRef<THREE.Group | null>(null);
   const zones = useRef<THREE.Group | null>(null);
+  const heatLayer = useRef<THREE.Group | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showZones, setShowZones] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(true);
   const [unsupported, setUnsupported] = useState(false);
   const flags = useRef({ autoRotate: false });
 
@@ -162,9 +216,11 @@ export default function RotorViewer({ defects }: { defects: RotorDefect[] }) {
     const rotor = buildRotor();
     const zoneGroup = buildZones();
     const markerGroup = new THREE.Group();
-    scene.add(rotor, zoneGroup, markerGroup);
+    const heatGroup = new THREE.Group();
+    scene.add(rotor, zoneGroup, markerGroup, heatGroup);
     markers.current = markerGroup;
     zones.current = zoneGroup;
+    heatLayer.current = heatGroup;
     const floor = new THREE.GridHelper(420, 14, 0x3c545c, 0x2a3d44);
     floor.position.y = -1;
     scene.add(floor);
@@ -213,9 +269,24 @@ export default function RotorViewer({ defects }: { defects: RotorDefect[] }) {
       renderer.domElement.remove();
       markers.current = null;
       zones.current = null;
+      heatLayer.current = null;
       controlsRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const group = heatLayer.current;
+    if (!group) return;
+    for (const child of [...group.children]) {
+      group.remove(child);
+      const texture = child.userData.heatmapTexture as THREE.Texture | undefined;
+      disposeTree(child);
+      texture?.dispose();
+    }
+    const layer = heatmap ? buildHeatmap(heatmap) : null;
+    if (layer) group.add(layer);
+    group.visible = Boolean(layer && showHeatmap);
+  }, [heatmap, showHeatmap]);
 
   // Rebuild defect markers when the inspection changes.
   useEffect(() => {
@@ -243,12 +314,13 @@ export default function RotorViewer({ defects }: { defects: RotorDefect[] }) {
       <div className="buttons">
         <button onClick={() => setAutoRotate(v => !v)} aria-pressed={autoRotate}>{autoRotate ? 'Stop rotation' : 'Auto-rotate'}</button>
         <button onClick={() => setShowZones(v => !v)} aria-pressed={showZones}>{showZones ? 'Hide zones' : 'Show zones'}</button>
+        {heatmap && <button onClick={() => setShowHeatmap(v => !v)} aria-pressed={showHeatmap}>{showHeatmap ? 'Hide heatmap' : 'Show heatmap'}</button>}
         <button onClick={() => { (mount.current as (HTMLDivElement & { resetView?: () => void }) | null)?.resetView?.(); }}>Reset view</button>
       </div>
       {showZones && <ul className="zone-legend">{ZONES.map(z => <li key={z.name}><i style={{ background: `#${z.color.toString(16).padStart(6, '0')}` }} />{z.name} · {z.from}–{z.to} mm</li>)}</ul>}
       <h3>Located defects</h3>
       {defects.length === 0 ? <p className="muted">No defects to place on this part.</p> : <ul className="defect-list">{defects.map((d, i) => <li key={i}><i style={{ background: `#${(SEVERITY_COLOR[d.severity.level] ?? 0xd8342a).toString(16).padStart(6, '0')}` }} /><div><strong>{d.label.replaceAll('_', ' ')}</strong><span>{d.severity.level} · r {d.r_mm} mm · θ {d.theta_deg}° · {d.zone.replaceAll('_', ' ')}</span></div></li>)}</ul>}
-      <p className="footnote">Drag to orbit, scroll to zoom. Procedural rotor with nominal proportions. Defect positions come from the replay measurements (radius and angle).</p>
+      <p className="footnote">Drag to orbit, scroll to zoom. {heatmap ? 'The PatchCore distance grid is projected onto a procedural rotor for visualization; it is not a pixel mask, physical registration, or camera-tracked AR.' : 'Procedural rotor with nominal proportions. Defect positions come from replay measurements.'}</p>
     </div>
   </div>;
 }
