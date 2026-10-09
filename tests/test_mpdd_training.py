@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from scripts.train_mpdd import normal_threshold, validate_manifest, test_metrics
+from scripts.train_mpdd import normal_threshold, validate_manifest, metrics_on_test_split
 
 
 def manifest():
@@ -37,7 +37,7 @@ class MPDDTests(unittest.TestCase):
 
     def test_metrics_false_alarm_recall_tradeoff(self):
         records = [{'label': label} for label in ['normal', 'normal', 'defect', 'defect']]
-        metrics = test_metrics(records, [1., 2., 2., 3.], 2.)
+        metrics = metrics_on_test_split(records, [1., 2., 2., 3.], 2.)
         self.assertEqual(metrics['confusion_matrix'], [[2, 0], [1, 1]])
         self.assertEqual(metrics['normal_fpr'], 0.)
         self.assertEqual(metrics['recall'], .5)

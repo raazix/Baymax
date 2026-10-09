@@ -190,9 +190,11 @@ class Repository:
                     'rows_inserted': 0, 'rows_duplicate': existing_dataset.rows_read, 'already_imported': True}
             candidates = {item['id']: item for item in readings}
             present = set(session.scalars(select(HistoricalSensorReading.id).where(HistoricalSensorReading.id.in_(candidates)))) if candidates else set()
-            new_readings = [item for key, item in candidates.items() if key not in present]
+            # Every reading must point at its import manifest (NOT NULL foreign key).
+            new_readings = [item | {'dataset_sha256': dataset['sha256']} for key, item in candidates.items() if key not in present]
             manifest = SensorDataset(**(dataset | {'rows_inserted': len(new_readings), 'rows_duplicate': dataset['rows_duplicate'] + len(readings) - len(new_readings)}))
             session.add(manifest)
+            session.flush()   # no ORM relationship is declared, so insert the manifest before the readings that reference it
             session.add_all(HistoricalSensorReading(**item) for item in new_readings)
             return {'sha256': manifest.sha256, 'filename': manifest.filename, 'source_label': manifest.source_label,
                 'rows_read': manifest.rows_read, 'rows_inserted': manifest.rows_inserted,
@@ -206,6 +208,28 @@ class Repository:
             return {'machines': machines, 'sensors': sensors, 'reading_count': session.scalar(select(func.count()).select_from(HistoricalSensorReading)) or 0,
                 'dataset_count': session.scalar(select(func.count()).select_from(SensorDataset)) or 0,
                 'source': 'imported historical sensor readings; source labels are user supplied'}
+
+    def lot_aggregates(self, machine_id, limit_lots=24):
+        """Per-lot sensor means for one machine, oldest first, plus the source labels of the contributing imports."""
+        from sqlalchemy import select, func
+        with Session(self.engine) as session:
+            reading = HistoricalSensorReading
+            rows = session.execute(select(reading.lot_id, reading.sensor_name, func.avg(reading.value), func.count(),
+                                          func.min(reading.observed_at), func.max(reading.observed_at), func.min(reading.unit))
+                                   .where(reading.machine_id == machine_id, reading.lot_id.is_not(None))
+                                   .group_by(reading.lot_id, reading.sensor_name)).all()
+            labels = list(session.scalars(select(SensorDataset.source_label).distinct()
+                                          .join(reading, reading.dataset_sha256 == SensorDataset.sha256)
+                                          .where(reading.machine_id == machine_id)))
+        lots = {}
+        for lot_id, sensor, mean, count, first, last, unit in rows:
+            lot = lots.setdefault(lot_id, {'lot_id': lot_id, 'values': {}, 'units': {}, 'readings': 0, 'start': first, 'end': last})
+            lot['values'][sensor] = float(mean); lot['units'][sensor] = unit; lot['readings'] += int(count)
+            lot['start'] = min(lot['start'], first); lot['end'] = max(lot['end'], last)
+        ordered = sorted(lots.values(), key=lambda item: item['end'])[-limit_lots:]
+        for item in ordered:
+            item['start'] = item['start'].isoformat(); item['end'] = item['end'].isoformat()
+        return {'lots': ordered, 'source_labels': labels}
 
     def sensor_history(self, machine_id, sensor_name, start, end, limit=500):
         from sqlalchemy import select, and_, func

@@ -1,4 +1,4 @@
-export type OverlayBox = { label: string; confidence: number; bbox_xyxy_px: number[] };
+export type OverlayBox = { label: string; confidence: number; bbox_xyxy_px: number[]; unconfirmed?: boolean };
 export type OverlayAnomaly = { grid: number[][]; threshold: number };
 export type OverlayGeometry = { center_px: number[]; semi_axes_px: number[]; angle_deg: number };
 export type OverlayMarker = { x: number; y: number; label: string };
@@ -47,13 +47,27 @@ function heatColor(t: number): [number, number, number] {
   return stops[stops.length - 1][1];
 }
 
-function drawHeatmap(ctx: CanvasRenderingContext2D, width: number, height: number, anomaly: OverlayAnomaly) {
+function drawHeatmap(ctx: CanvasRenderingContext2D, width: number, height: number, anomaly: OverlayAnomaly, geometry?: OverlayGeometry | null) {
   const rows = anomaly.grid.length;
   const cols = anomaly.grid[0]?.length ?? 0;
   if (!rows || !cols) return;
-  const floor = anomaly.threshold * 0.9;
-  const peakValue = Math.max(...anomaly.grid.flat());
-  const top = Math.max(peakValue, anomaly.threshold * 1.15);
+  // A normal-only PatchCore threshold can sit above every patch in a good image.
+  // Scale the visualization to this image's robust range while reserving red for threshold breaches.
+  // When part geometry is reliable, suppress the surrounding scene so background texture is not highlighted.
+  const insidePart = (x: number, y: number) => {
+    if (!geometry) return true;
+    const px = (x + .5) * width / cols - geometry.center_px[0];
+    const py = (y + .5) * height / rows - geometry.center_px[1];
+    const angle = geometry.angle_deg * Math.PI / 180;
+    const u = (px * Math.cos(angle) + py * Math.sin(angle)) / geometry.semi_axes_px[0];
+    const v = (-px * Math.sin(angle) + py * Math.cos(angle)) / geometry.semi_axes_px[1];
+    return u * u + v * v <= 1.1025;
+  };
+  const values = anomaly.grid.flatMap((row, y) => row.filter((value, x) => Number.isFinite(value) && insidePart(x, y))).sort((a, b) => a - b);
+  if (!values.length) return;
+  const quantile = (q: number) => values[Math.min(values.length - 1, Math.floor((values.length - 1) * q))];
+  const floor = quantile(.1);
+  const top = Math.max(quantile(.95), floor + 1e-6);
   // Paint one pixel per patch, then let the browser upsample smoothly.
   const small = document.createElement('canvas');
   small.width = cols; small.height = rows;
@@ -62,13 +76,13 @@ function drawHeatmap(ctx: CanvasRenderingContext2D, width: number, height: numbe
   const pixels = sctx.createImageData(cols, rows);
   let peak = { value: -Infinity, x: 0, y: 0 };
   anomaly.grid.forEach((row, y) => row.forEach((value, x) => {
-    if (value > peak.value) peak = { value, x, y };
     const i = (y * cols + x) * 4;
-    if (value < floor) { pixels.data[i + 3] = 0; return; }
+    if (!insidePart(x, y) || !Number.isFinite(value)) { pixels.data[i + 3] = 0; return; }
+    if (value > peak.value) peak = { value, x, y };
     const above = value > anomaly.threshold;
-    const t = above ? 1 : (value - floor) / (anomaly.threshold - floor);
+    const t = above ? 1 : Math.max(0, Math.min(1, (value - floor) / (top - floor)));
     const [r, g, b] = heatColor(Math.min(1, t));
-    const strength = above ? .55 + .3 * Math.min(1, (value - anomaly.threshold) / Math.max(top - anomaly.threshold, 1e-6)) : .12 + .3 * t;
+    const strength = above ? .62 + .25 * Math.min(1, (value - anomaly.threshold) / Math.max(top - anomaly.threshold, 1e-6)) : .14 + .34 * t;
     pixels.data.set([r, g, b, Math.round(strength * 255)], i);
   }));
   sctx.putImageData(pixels, 0, 0);
@@ -77,7 +91,8 @@ function drawHeatmap(ctx: CanvasRenderingContext2D, width: number, height: numbe
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(small, 0, 0, width, height);
   ctx.restore();
-  // Ring the single most anomalous patch so the eye lands on it.
+  // Only ring a threshold breach. A merely highest-scoring normal patch is not a defect finding.
+  if (peak.value <= anomaly.threshold) return;
   const cx = (peak.x + .5) * width / cols;
   const cy = (peak.y + .5) * height / rows;
   const radius = Math.max(width / cols, height / rows) * 1.8;
@@ -96,20 +111,23 @@ export function drawOverlay(canvas: HTMLCanvasElement, image: HTMLImageElement, 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   if (includeImage) ctx.drawImage(image, 0, 0); else ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (anomaly) drawHeatmap(ctx, canvas.width, canvas.height, anomaly);
+  if (anomaly) drawHeatmap(ctx, canvas.width, canvas.height, anomaly, geometry);
   if (geometry) drawGeometry(ctx, canvas.width, geometry, markers);
   const stroke = Math.max(2, Math.round(canvas.width / 200));
-  const font = Math.max(12, Math.round(canvas.width / 40));
+  const font = Math.max(9, Math.round(Math.max(canvas.width, canvas.height) / 30));   // small images are scaled up on screen
   ctx.lineWidth = stroke;
   ctx.font = `600 ${font}px sans-serif`;
   ctx.textBaseline = 'top';
   for (const d of boxes) {
     const [x1, y1, x2, y2] = d.bbox_xyxy_px;
-    ctx.strokeStyle = '#e0452b';
+    const colour = d.unconfirmed ? '#5d6f73' : '#e0452b';
+    ctx.strokeStyle = colour;
+    ctx.setLineDash(d.unconfirmed ? [stroke * 4, stroke * 3] : []);
     ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-    const text = `${d.label.replaceAll('_', ' ')} ${(d.confidence * 100).toFixed(0)}%`;
+    ctx.setLineDash([]);
+    const text = `${d.unconfirmed ? 'YOLO? ' : ''}${d.label.replaceAll('_', ' ')} ${(d.confidence * 100).toFixed(0)}%`;
     const w = ctx.measureText(text).width + 8;
-    ctx.fillStyle = '#e0452b';
+    ctx.fillStyle = colour;
     ctx.fillRect(x1, Math.max(0, y1 - font - 4), w, font + 4);
     ctx.fillStyle = '#fff';
     ctx.fillText(text, x1 + 4, Math.max(0, y1 - font - 4) + 2);

@@ -6,7 +6,7 @@ import { drawOverlay, type OverlayAnomaly, type OverlayBox, type OverlayGeometry
 
 type UploadedDefect = { label: string; confidence?: number; bbox_xyxy_px?: number[] };
 
-export default function InspectionImage({ src, defects, anomaly, geometry, markers = [], alt }: { src: string; defects: UploadedDefect[]; anomaly?: OverlayAnomaly | null; geometry?: OverlayGeometry | null; markers?: OverlayMarker[]; alt: string }) {
+export default function InspectionImage({ src, defects, anomaly, geometry, markers = [], hints = [], legend, alt }: { src: string; defects: UploadedDefect[]; anomaly?: OverlayAnomaly | null; geometry?: OverlayGeometry | null; markers?: OverlayMarker[]; hints?: OverlayBox[]; legend?: string; alt: string }) {
   const base = useRef<HTMLCanvasElement>(null);
   const layer = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -28,10 +28,10 @@ export default function InspectionImage({ src, defects, anomaly, geometry, marke
     if (!image || !base.current || !layer.current) return;
     drawOverlay(base.current, image, []);
     const boxes: OverlayBox[] = defects.filter(d => d.bbox_xyxy_px && d.confidence !== undefined).map(d => ({ label: d.label, confidence: d.confidence!, bbox_xyxy_px: d.bbox_xyxy_px! }));
-    drawOverlay(layer.current, image, boxes, anomaly ?? undefined, false, geometry, markers);
-  }, [image, defects, anomaly, geometry, markers]);
+    drawOverlay(layer.current, image, [...hints, ...boxes], anomaly ?? undefined, false, geometry, markers);
+  }, [image, defects, anomaly, geometry, markers, hints]);
 
-  const hasModelLayer = Boolean(anomaly) || Boolean(geometry) || defects.some(d => d.bbox_xyxy_px);
+  const hasModelLayer = Boolean(anomaly) || Boolean(geometry) || hints.length > 0 || defects.some(d => d.bbox_xyxy_px);
   return <div className="inspection-image">
     {failed ? <p className="inference-error" role="alert">The uploaded image could not be loaded.</p> : <div className="image-stack">
       <canvas ref={base} role="img" aria-label={alt} />
@@ -43,7 +43,7 @@ export default function InspectionImage({ src, defects, anomaly, geometry, marke
     </div>}
     <div className="overlay-row">
       {hasModelLayer && <label className="overlay-toggle"><input type="checkbox" checked={overlay} onChange={e => setOverlay(e.target.checked)} /> Show model overlay</label>}
-      {anomaly && <span className="heat-legend" aria-hidden="true"><i className="heat-scale" />low to high anomaly</span>}
+      {anomaly && <span className="heat-legend" aria-hidden="true"><i className="heat-scale" />{legend ?? 'low to high anomaly'}</span>}
       {geometry && <span className="heat-legend" aria-hidden="true"><i className="rim-key" />outline / centre / position</span>}
     </div>
   </div>;

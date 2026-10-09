@@ -56,7 +56,11 @@ def analyze_forecast(telemetry: dict, seed: int) -> dict:
     artifact = load_artifact()
     row, history_note = feature_row(telemetry)
     prediction = float(np.clip(artifact['model'].predict(row.reshape(1, -1)).ravel()[0], 0, 1))
-    uncertainty = simulate(prediction, artifact['residuals'], seed=seed)
+    from analytics.calibration import section
+    calibration = section('forecast', artifact['_loaded_sha256'])
+    interval_scale = (calibration or {}).get('interval_scale', 1.0)
+    uncertainty = simulate(prediction, artifact['residuals'], seed=seed, interval_scale=interval_scale)
+    uncertainty['interval_calibration'] = 'synthetic later-lot coverage calibration' if calibration else 'not calibrated for this artifact'
     return {'forecast': {'risk': prediction, 'predicted_defect_fraction': prediction,
         'horizon': 'next lot', 'method': 'trained PLSR on synthetic ordered lots',
         'pcr_role': 'benchmark only', 'calibrated_event_probability': False,

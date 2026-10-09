@@ -63,6 +63,9 @@ class ProxyDetector:
                 detections = [{'label': self.model.names[int(box.cls.item())], 'confidence': float(box.conf.item()),
                                'bbox_xyxy_px': box.xyxy[0].tolist()} for box in result.boxes]
                 inference = {'mode': 'full', 'engine': 'ultralytics', 'model_input_size': 640, 'confidence_threshold': .25}
+            from analytics.calibration import isotonic
+            for detection in detections:
+                detection['calibrated_confidence'] = isotonic('yolo', detection['confidence'], self.digest)
             return {'source': 'trained_neu_proxy', 'detections': detections,
                     'inference': inference,
                     'model_sha256': self.digest, 'brake_disc_validated': False,

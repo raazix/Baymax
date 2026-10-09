@@ -1,0 +1,437 @@
+{
+  "dataset": "user-provided brake-disc folders",
+  "counts": {
+    "correct": 22,
+    "defects": 6,
+    "rusted": 12
+  },
+  "unique_source_images": 40,
+  "same_source_grouping": "unknown; exact byte hashes unique only",
+  "patchcore": {
+    "artifact_sha256": "f50767650a42c3e6e32d8c46aa3f9c030bc9d5fee8027e436405ccb8f08a65a7",
+    "threshold": 4.224560356140137,
+    "train_normal": 17,
+    "heldout_normal_threshold_images": 5,
+    "evaluation_n": 40,
+    "labels": "correct vs defects+rusted; user folder labels",
+    "metrics": {
+      "confusion_tn_fp_fn_tp": [
+        22,
+        0,
+        17,
+        1
+      ],
+      "precision": 1.0,
+      "recall": 0.05555555555555555,
+      "f1": 0.10526315789473684
+    },
+    "per_folder": {
+      "correct": {
+        "n": 22,
+        "flagged": 0
+      },
+      "defects": {
+        "n": 6,
+        "flagged": 1
+      },
+      "rusted": {
+        "n": 12,
+        "flagged": 0
+      }
+    },
+    "threshold_rule": "existing maximum of 5 held-out normals ? 1.10; no defect labels used to select threshold"
+  },
+  "corrosion": {
+    "artifact_sha256": "21053a1efd28885bcfccd2069dbabda5639a449537f3a911e63a5b5d0217c22a",
+    "normal_threshold": 0.8076,
+    "threshold_rule": "maximum raw corrosion score among the same 5 held-out correct images",
+    "evaluation_n": 18,
+    "labels": "rusted vs defects; excludes correct calibration images",
+    "metrics": {
+      "confusion_tn_fp_fn_tp": [
+        2,
+        4,
+        3,
+        9
+      ],
+      "precision": 0.6923076923076923,
+      "recall": 0.75,
+      "f1": 0.72
+    },
+    "auroc": 0.6805555555555556,
+    "per_folder": {
+      "defects": {
+        "n": 6,
+        "flagged": 4
+      },
+      "rusted": {
+        "n": 12,
+        "flagged": 9
+      }
+    },
+    "note": "Small source-folder check, not independent brake-disc validation; severe-grade head not calibrated for discs."
+  },
+  "per_image": [
+    {
+      "category": "correct",
+      "file": "145.jpg",
+      "patchcore_score": 2.82183575630188,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9228,
+      "rust_severe_score": 0.4569,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "214.jpg",
+      "patchcore_score": 2.7622928619384766,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.6819,
+      "rust_severe_score": 0.7305,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "23.jpg",
+      "patchcore_score": 2.9115545749664307,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9177,
+      "rust_severe_score": 0.0524,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "567.jpg",
+      "patchcore_score": 3.841416120529175,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8076,
+      "rust_severe_score": 0.4027,
+      "heldout_normal": true
+    },
+    {
+      "category": "correct",
+      "file": "6573.jpg",
+      "patchcore_score": 2.8707990646362305,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.5536,
+      "rust_severe_score": 0.4878,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "734.jpg",
+      "patchcore_score": 3.5178606510162354,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.6748,
+      "rust_severe_score": 0.2087,
+      "heldout_normal": true
+    },
+    {
+      "category": "correct",
+      "file": "basic_005-dynatrac-pro-grip-jeep-wrangler-big-brake-kit.jpg",
+      "patchcore_score": 2.974478244781494,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.5403,
+      "rust_severe_score": 0.1318,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "closeup-car-disk-brake-maintenance-service-car-garage-copy-spcae-car-parts-disk-brake-concept-closeup-car-disk-brake-145290438.webp",
+      "patchcore_score": 2.8987698554992676,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.1001,
+      "rust_severe_score": 0.0443,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "disc-brakes-stopping-break-car-suspension-bearing-parts-concept-new-front-wheels-brake-type-replacement-service-128553182.webp",
+      "patchcore_score": 2.702317714691162,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.325,
+      "rust_severe_score": 0.4721,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "front-view-of-new-brake-disc-on-old-car-close-up-R0873C.jpg",
+      "patchcore_score": 2.7476959228515625,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.879,
+      "rust_severe_score": 0.4976,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "high-performance-car-disc-brake-system-showcasing-a-ventilated-rotor-and-a-bright-red-caliper-designed-for-enhanced-stopping-power-isolated-white-bac-3A232DB.jpg",
+      "patchcore_score": 2.7458338737487793,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8491,
+      "rust_severe_score": 0.0725,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "images.jpg",
+      "patchcore_score": 3.6562082767486572,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": null,
+      "rust_severe_score": null,
+      "heldout_normal": true
+    },
+    {
+      "category": "correct",
+      "file": "pexels-photo-4022543.avif",
+      "patchcore_score": 3.4769718647003174,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.706,
+      "rust_severe_score": 0.1501,
+      "heldout_normal": true
+    },
+    {
+      "category": "correct",
+      "file": "product-jpeg-500x500.webp",
+      "patchcore_score": 2.7146968841552734,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8047,
+      "rust_severe_score": 0.1033,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "stock-photo-a-car-brake-disc-and-axle-being-inspected-during-a-wheel-change-657583255.jpg",
+      "patchcore_score": 2.7648866176605225,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.7165,
+      "rust_severe_score": 0.7558,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "stock-photo-close-car-disc-brake-wheel-tire-change-repair-disc-brake.webp",
+      "patchcore_score": 2.947131633758545,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.6407,
+      "rust_severe_score": 0.0776,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.25 AM (1).jpeg",
+      "patchcore_score": 3.3605988025665283,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": null,
+      "rust_severe_score": null,
+      "heldout_normal": true
+    },
+    {
+      "category": "correct",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.25 AM.jpeg",
+      "patchcore_score": 2.8368756771087646,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.1232,
+      "rust_severe_score": 0.0392,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.26 AM (1).jpeg",
+      "patchcore_score": 2.7962965965270996,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.726,
+      "rust_severe_score": 0.1403,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.26 AM.jpeg",
+      "patchcore_score": 2.8425514698028564,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.994,
+      "rust_severe_score": 0.206,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.27 AM.jpeg",
+      "patchcore_score": 2.8103256225585938,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.2337,
+      "rust_severe_score": 0.0861,
+      "heldout_normal": false
+    },
+    {
+      "category": "correct",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.28 AM.jpeg",
+      "patchcore_score": 2.830561399459839,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.2203,
+      "rust_severe_score": 0.3359,
+      "heldout_normal": false
+    },
+    {
+      "category": "defects",
+      "file": "123.jpg",
+      "patchcore_score": 3.7424733638763428,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8981,
+      "rust_severe_score": 0.4192,
+      "heldout_normal": false
+    },
+    {
+      "category": "defects",
+      "file": "13.jpg",
+      "patchcore_score": 3.692211151123047,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9253,
+      "rust_severe_score": 0.3282,
+      "heldout_normal": false
+    },
+    {
+      "category": "defects",
+      "file": "images.jpg",
+      "patchcore_score": 4.272227764129639,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8721,
+      "rust_severe_score": 0.1447,
+      "heldout_normal": false
+    },
+    {
+      "category": "defects",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.27 AM (1).jpeg",
+      "patchcore_score": 3.686631441116333,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.4728,
+      "rust_severe_score": 0.517,
+      "heldout_normal": false
+    },
+    {
+      "category": "defects",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.29 AM.jpeg",
+      "patchcore_score": 3.7540392875671387,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.887,
+      "rust_severe_score": 0.4192,
+      "heldout_normal": false
+    },
+    {
+      "category": "defects",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.30 AM.jpeg",
+      "patchcore_score": 3.808825731277466,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.3485,
+      "rust_severe_score": 0.0995,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "12.jpg",
+      "patchcore_score": 3.6796035766601562,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9955,
+      "rust_severe_score": 0.4491,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "16jd821evt4f1.jpg",
+      "patchcore_score": 3.5490620136260986,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8187,
+      "rust_severe_score": 0.8608,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "67.jpg",
+      "patchcore_score": 3.8460428714752197,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.5061,
+      "rust_severe_score": 0.1455,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "Brake-rotor-5-500x333.webp",
+      "patchcore_score": 3.2785942554473877,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9885,
+      "rust_severe_score": 0.1582,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "Gemini_Generated_Image_e5gjqqe5gjqqe5gj-1-300x300.png",
+      "patchcore_score": 4.1132330894470215,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9801,
+      "rust_severe_score": 0.0958,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "Heavily-Rusted-Rotors.jpg",
+      "patchcore_score": 3.945981979370117,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9985,
+      "rust_severe_score": 0.1216,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "rust-on-car-brake-system.jpg",
+      "patchcore_score": 4.134880542755127,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8793,
+      "rust_severe_score": 0.1812,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "rusted-vehicle-brake-pad-rotor-1738009836334.jpg",
+      "patchcore_score": 3.762890100479126,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9988,
+      "rust_severe_score": 0.0083,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "rusty-brake-rotors_.webp",
+      "patchcore_score": 3.603506565093994,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.6616,
+      "rust_severe_score": 0.6315,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.28 AM (1).jpeg",
+      "patchcore_score": 3.2757911682128906,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.5646,
+      "rust_severe_score": 0.3985,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.28 AM (2).jpeg",
+      "patchcore_score": 3.650670051574707,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.9895,
+      "rust_severe_score": 0.2208,
+      "heldout_normal": false
+    },
+    {
+      "category": "rusted",
+      "file": "WhatsApp Image 2026-10-09 at 7.45.29 AM (1).jpeg",
+      "patchcore_score": 4.214580535888672,
+      "patchcore_threshold": 4.224560356140137,
+      "rust_probability": 0.8444,
+      "rust_severe_score": 0.1501,
+      "heldout_normal": false
+    }
+  ],
+  "limitations": "Tiny user folder; labels denote folder categories. Similar images may share web/source images; no image/source grouping metadata. Does not establish factory error rates."
+}

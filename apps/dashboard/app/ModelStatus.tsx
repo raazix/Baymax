@@ -22,6 +22,7 @@ export default function ModelStatus() {
           setRows([
             { label: 'PatchCore', role: 'casting anomaly', state: state('patchcore') },
             { label: 'YOLO11n', role: 'steel defects', state: state('proxy_detection') },
+            { label: 'Corrosion', role: 'rust / severity grade', state: state('corrosion') },
             { label: 'XGBoost', role: 'root cause + SHAP', state: state('xgboost_rca', false) },
             { label: 'PLSR', role: 'next-lot forecast', state: state('plsr', false) },
             { label: 'Monte Carlo', role: '10k risk draws', state: state('plsr', false) },

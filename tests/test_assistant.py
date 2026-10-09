@@ -32,8 +32,11 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result['read_only'])
         self.assertEqual(original, json.dumps(self.inspection))
         saved = assistant.read_record(result['id'])
-        self.assertEqual(saved['evidence_snapshot']['facts']['anomaly']['threshold'], 2.3)
-        self.assertNotIn('grid', saved['evidence_snapshot']['facts']['anomaly'])
+        vision = saved['evidence_snapshot']['facts']['vision']
+        self.assertEqual(vision['anomaly_threshold'], 2.3)
+        self.assertNotIn('grid', json.dumps(saved['evidence_snapshot']))      # compact packet never ships the anomaly grid
+        self.assertEqual(saved['evidence_format'], 'compact')
+        self.assertEqual(saved['number_grounding'], 'passed')
         self.assertNotIn('evidence_snapshot', result)
         self.assertFalse(provider.call_args.kwargs['json']['stream'])
         path = assistant.STORE / (result['id'] + '.json')
@@ -41,6 +44,45 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(assistant.AssistantUnavailable) as error:
             assistant.read_record(result['id'])
         self.assertEqual(error.exception.status, 409)
+
+    async def test_invented_numbers_trigger_one_corrective_retry(self):
+        invented = httpx.Response(200, json={'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps({
+            'answer': 'The defect is 87.4 mm long and the score is 9.81.', 'evidence_ids': ['inspection']})}}]})
+        provider = AsyncMock(side_effect=[invented, self.provider_answer()])
+        with patch.object(assistant, 'provider_post', provider):
+            result = await assistant.explain(self.inspection, 'How big is it?')
+        self.assertEqual(provider.await_count, 2)
+        self.assertIn('87.4', provider.call_args.kwargs['json']['messages'][-1]['content'])
+        self.assertEqual(result['attempts'], 2)
+        with patch.object(assistant, 'provider_post', AsyncMock(side_effect=[invented, invented])):
+            with self.assertRaises(assistant.AssistantUnavailable):
+                await assistant.explain(self.inspection, 'Different question', use_cache=False)
+
+    async def test_identical_question_and_evidence_is_served_from_cache(self):
+        provider = AsyncMock(return_value=self.provider_answer())
+        with patch.object(assistant, 'provider_post', provider):
+            first = await assistant.explain(self.inspection, 'Why flagged?')
+            second = await assistant.explain(self.inspection, '  why   FLAGGED? ')
+        self.assertEqual(provider.await_count, 1)
+        self.assertFalse(first['cached']); self.assertTrue(second['cached'])
+        self.assertEqual(first['id'], second['id'])
+
+    async def test_provider_outage_falls_back_to_other_model_once(self):
+        outage = assistant.AssistantUnavailable('NVIDIA could not complete the request (HTTP 503).', 502)
+        provider = AsyncMock(side_effect=[outage, self.provider_answer()])
+        with patch.object(assistant, 'provider_post', provider):
+            result = await assistant.explain(self.inspection, 'Fallback?', use_cache=False)
+        self.assertTrue(result['fallback_used'])
+        self.assertEqual(result['model'], assistant.FALLBACK_MODEL)
+        denied = assistant.AssistantUnavailable('NVIDIA denied this request.', 502)
+        with patch.object(assistant, 'provider_post', AsyncMock(side_effect=[denied])):
+            with self.assertRaises(assistant.AssistantUnavailable):
+                await assistant.explain(self.inspection, 'Denied?', use_cache=False)
+
+    def test_grounding_accepts_percent_forms_of_fractions(self):
+        packet = {'facts': {'forecast': {'next_lot_defect_fraction': .301}, 'size_mm': [45.74, 35.6]}}
+        self.assertEqual(assistant.ungrounded_numbers('Risk about 30.1% for a 45.7 mm region.', packet), [])
+        self.assertEqual(assistant.ungrounded_numbers('Risk 64% on a 12.5 mm region.', packet), ['64%', '12.5'])
 
     async def test_unknown_citations_rejected(self):
         with patch.object(assistant, 'provider_post', AsyncMock(return_value=self.provider_answer(['invented']))):
@@ -92,6 +134,14 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(assistant.AssistantUnavailable) as error:
                 await assistant.provider_post('https://example.invalid', provider='NVIDIA')
         self.assertNotIn('secret-provider-error', str(error.exception))
+
+    async def test_provider_reports_missing_elevenlabs_permission_without_echoing_payload(self):
+        response = httpx.Response(401, json={'detail': {'message': 'The API key is missing the permission text_to_speech to execute this operation.', 'request_id': 'private'}})
+        with patch('httpx.AsyncClient.post', AsyncMock(return_value=response)):
+            with self.assertRaises(assistant.AssistantUnavailable) as error:
+                await assistant.provider_post('https://example.invalid', provider='ElevenLabs')
+        self.assertIn('text_to_speech permission', str(error.exception))
+        self.assertNotIn('private', str(error.exception))
 
     def test_invalid_response_path(self):
         with self.assertRaises(assistant.AssistantUnavailable):

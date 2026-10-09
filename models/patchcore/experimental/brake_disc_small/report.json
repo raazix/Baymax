@@ -1,0 +1,102 @@
+{
+  "status": "EXPERIMENTAL_NOT_FOR_PRODUCTION",
+  "method": "Frozen ImageNet ResNet18 PatchCore memory bank",
+  "device": "cuda:0",
+  "normal_reference_candidates": [
+    "disc_01.jpeg",
+    "disc_02.jpeg",
+    "disc_04.jpeg"
+  ],
+  "reference_count": 3,
+  "unlabelled_count": 9,
+  "threshold": null,
+  "reason": "Three plausible normal images cannot support held-out threshold calibration; no verified defect labels.",
+  "coreset": {
+    "method": "approximate greedy farthest-point random projection",
+    "seed": 42,
+    "input_patches": 2352,
+    "candidate_patches": 2352,
+    "candidate_limit": 50000,
+    "candidate_pool_subsampled": false,
+    "projection_dim": 64,
+    "selected_patches": 1024,
+    "projection_max_squared_covering_distance": 0.731608510017395,
+    "approximation": "Seeded random candidate subsampling when needed, then Gaussian projected-space greedy selection; original embeddings retained."
+  },
+  "artifact_sha256": "41ae824cd3af8129b4de67a790eaad5c18b14a6477fe2088a3e414817367252c",
+  "scores_sorted_descending": [
+    {
+      "image": "disc_08.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.940199,
+      "sha256": "f57d216f9ba572d1ae72af9e24c8e6c3ca9998ea277d92c6f4e6ac86f98048c6"
+    },
+    {
+      "image": "disc_07.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.741487,
+      "sha256": "a3bf9e0bcb584457a8657d4c81be0d8bece86631cf128f57c8673a37e4b16dad"
+    },
+    {
+      "image": "disc_10.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.722617,
+      "sha256": "1d956e473697e18330becd47b5c649cb495c1706067e1befdb492caa22746c7d"
+    },
+    {
+      "image": "disc_11.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.539338,
+      "sha256": "d7b5d03484956bfddf0aade85d0a32cae200489696fa7cadd0dfb740f09753a2"
+    },
+    {
+      "image": "disc_12.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.531181,
+      "sha256": "dfaeba848141b052dd9ee8d1e203603589c113cbb911fb81c02fc82299981d32"
+    },
+    {
+      "image": "disc_03.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.461113,
+      "sha256": "376477f323792e56045f551297c6bfed298daef36f19b09c12862334070f41ce"
+    },
+    {
+      "image": "disc_05.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.31156,
+      "sha256": "f077bc931dc5c98ba56c9fcf15a876b79b22458a45fcf6e29c93de76d18c4051"
+    },
+    {
+      "image": "disc_06.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 4.085781,
+      "sha256": "7d844e279b79502332684f6b6dffea0c24d5c91be5d048071d5f8f1a931a0e20"
+    },
+    {
+      "image": "disc_09.jpeg",
+      "role": "unlabelled_candidate",
+      "anomaly_score": 3.951769,
+      "sha256": "719974fa98590c44a98423dc84adb55b15712739a7c03fb0515b15ef0ff6e362"
+    },
+    {
+      "image": "disc_02.jpeg",
+      "role": "normal_reference_candidate",
+      "anomaly_score": 1.056352,
+      "sha256": "b33722ebb86750697ab0295ca9ea4f84c9bb77f8e0cccb0b781209252b0a6964"
+    },
+    {
+      "image": "disc_04.jpeg",
+      "role": "normal_reference_candidate",
+      "anomaly_score": 1.011013,
+      "sha256": "626e75cc32959878866d4bf94474cd3acb899a2e51e09ea708053754f4812f3f"
+    },
+    {
+      "image": "disc_01.jpeg",
+      "role": "normal_reference_candidate",
+      "anomaly_score": 0.978607,
+      "sha256": "6c7778541c1619af0ed42ac290fb4811305a9bca4e956d2d08934fa246057b7b"
+    }
+  ],
+  "limitations": "Image-level scores are not probabilities or severity. Background, lighting, rotor type and camera angle may dominate. No independent validation; never registered as active model."
+}

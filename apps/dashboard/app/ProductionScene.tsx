@@ -89,5 +89,5 @@ export default function ProductionScene({ stopped, manualPause }: { stopped: boo
     };
   }, []);
 
-  return <><div ref={host} className="production-scene" role="img" aria-label={`Manufacturing conveyor. ${stopped ? 'Stopped for a critical defect.' : 'Production simulation.'}`} />{error && <p role="status">{error}</p>}</>;
+  return <><div ref={host} className="production-scene" role="img" aria-label={`Manufacturing conveyor. ${stopped ? 'Stopped for a high or critical quality finding.' : 'Production simulation.'}`} />{error && <p role="status">{error}</p>}</>;
 }

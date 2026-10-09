@@ -1,0 +1,167 @@
+{
+  "name": "brake_disc",
+  "created_at": "2026-10-09T02:39:21Z",
+  "threshold": 4.224560356140137,
+  "train_images": 17,
+  "heldout_images": 5,
+  "bank_patches": 1024,
+  "heldout_scores": [
+    3.4785,
+    3.8405,
+    3.5112,
+    3.3533,
+    3.6556
+  ],
+  "heldout_score_max": 3.8405,
+  "heldout_score_mean": 3.5678,
+  "threshold_margin": 1.1,
+  "artifact_sha256": "f50767650a42c3e6e32d8c46aa3f9c030bc9d5fee8027e436405ccb8f08a65a7",
+  "seconds": 5.9,
+  "metadata": {
+    "method": "compact_patchcore_resnet18",
+    "data_source": "custom_normal_images",
+    "brake_disc_validated": false,
+    "custom_name": "brake_disc",
+    "seed": 42,
+    "training_normal_images": 17,
+    "training_defect_images": 0,
+    "heldout_normal_images": 5,
+    "train_sha256": [
+      "1a2a5e998b0abc9714f526768232b980e454fd83073e075fc4d75f846ac15cad",
+      "2028424c2c265670a7ffb9c5ac5f943133030408ef7071eb07a788a11bac9c69",
+      "253ce75345bf3a7517f0581ccdf26f34658e17f64c6bd9ab2429e6bbb888cfa0",
+      "2a2cd60d5b9b29d130ffe175721b70c150597bd2c91214509ec15989714b4c29",
+      "3690431c7d3d46525f32002f20f6c0fa8c3fe5ac6aae2703107c9fa186179a3a",
+      "3b5e724646125c448d0be2a72efc4b08b895ce5128702d01f3fbd6e7f3d36bb2",
+      "4b6b201eec4e19ed7f79f3b67d4419dd09f608d65c859243e33449959630a67f",
+      "4bea1183c046c1f480c21cbd7deca605af6ccbc16c2e642f86e5dad3dbeda5fc",
+      "657592fc1c86c27dd6207488e616c4b6c8522a98609140574ed82db74fe461db",
+      "679ee6391f2766bdadc6a8967d323a0c7cdf384d33144f618a7cd860d04391b7",
+      "7727e4c9c88655fe74aa14b9d4c5a31ce9f2a759e111415a92b74fbc8271aa55",
+      "84e68923dfd72aa96de8ad6491ba36768e7dd70ef5b74837c411db6da3193d37",
+      "9df6a9eed948384aeeb1cbdabe72c62a988f9627f427d72908bb04d082e1cf06",
+      "aeb968b246fa7b561f605acc143f55a488148fb9ca325581d80d0825c94a9fb0",
+      "b2efc094ac76af82f9124a308bce17a0a3aad3fa91c183000de7be8c2a23f831",
+      "b88ee3ce0167d89c30b90a6a3b8f0b09c11e6ec3ed11c3b6a81bb6ddc9ea02be",
+      "f4f38fb90299bc8ad840bfc253f3c32fb71461656263bbb127364077248d2b2f"
+    ],
+    "heldout_sha256": [
+      "172b66f625bea916ffaab057960e0d99a81c97d873e9d69dc139e721182427bf",
+      "2b5a555979fbb45110a974458badfd28eb4fda81f42c7796a1989927afe836b2",
+      "5e8cc52816c959bc1480a4874485671bfca6086860ae1d3d33a6e77fc4e8926c",
+      "8608ca623b81ead0650d89b26b80da271a31622d3b9518cdc0cecd8da15192a9",
+      "f28a4180180f942013cd0a96e0eefb36f1ed26a84e882060b61012a97e10d498"
+    ],
+    "coreset": {
+      "method": "approximate greedy farthest-point random projection",
+      "seed": 42,
+      "input_patches": 25872,
+      "candidate_patches": 25872,
+      "candidate_limit": 50000,
+      "candidate_pool_subsampled": false,
+      "projection_dim": 64,
+      "selected_patches": 1024,
+      "projection_max_squared_covering_distance": 6.306967258453369,
+      "approximation": "Seeded random candidate subsampling when needed, then Gaussian projected-space greedy selection; original embeddings retained."
+    },
+    "threshold": 4.224560356140137,
+    "threshold_selection": "Maximum held-out NORMAL score x 1.1. No defect images were used.",
+    "image_score": "Maximum nearest normal-patch Euclidean distance over square crops",
+    "limitations": "Experimental brake-disc normal-only PatchCore model. Trained from 17 images; threshold set using 5 held-out images from the same small collection. The images may share sources/backgrounds and are not independent production samples. No defect images used for training and no labelled defect test evaluation; anomaly scores are not probabilities or severity. Not production validated.",
+    "source_image_count": 22,
+    "source_images": [
+      {
+        "filename": "145.jpg",
+        "sha256": "4daff18d25a80a9750f6f27a9dda54a7f05c24f3197a6befb6debedaa9af6cc7"
+      },
+      {
+        "filename": "214.jpg",
+        "sha256": "a2af8cdde751f955eb16b586dae2e30cf464b608e8588e2871945e1b8d846b3c"
+      },
+      {
+        "filename": "23.jpg",
+        "sha256": "aa1513fd286d0be01c93bbc0503c3a4affcc22a03b91e802562c29ac880e8f66"
+      },
+      {
+        "filename": "567.jpg",
+        "sha256": "8d64b138931ad56a6b4dbba9813521db17208523efa290ef347b58383537bdbd"
+      },
+      {
+        "filename": "6573.jpg",
+        "sha256": "3eb7f4ac0b9edc7c114d028ea415902e9c5b7efee0fc3a5eac5ab0a046227e3d"
+      },
+      {
+        "filename": "734.jpg",
+        "sha256": "3d48f0ca6989ebb98710d625a2f2db4d29d6c63290ce45562e0d187441078233"
+      },
+      {
+        "filename": "basic_005-dynatrac-pro-grip-jeep-wrangler-big-brake-kit.jpg",
+        "sha256": "a52ef0903bfc3fcf4da4620c91922eb2cbc8d523c29155b18a44dea21b47e0ea"
+      },
+      {
+        "filename": "closeup-car-disk-brake-maintenance-service-car-garage-copy-spcae-car-parts-disk-brake-concept-closeup-car-disk-brake-145290438.webp",
+        "sha256": "a40a0cb21d50962d4b7920ce44f0db63c4ae77b6bf2aa2ce39388c0c6f028748"
+      },
+      {
+        "filename": "disc-brakes-stopping-break-car-suspension-bearing-parts-concept-new-front-wheels-brake-type-replacement-service-128553182.webp",
+        "sha256": "c42ec554a89402d69ec2a6f0cd100320b50a50eb0a008b1f7c51ddec354a392a"
+      },
+      {
+        "filename": "front-view-of-new-brake-disc-on-old-car-close-up-R0873C.jpg",
+        "sha256": "f5db217a13bda8a33e2489f51008cb252265b63934735e82685f836546af407b"
+      },
+      {
+        "filename": "high-performance-car-disc-brake-system-showcasing-a-ventilated-rotor-and-a-bright-red-caliper-designed-for-enhanced-stopping-power-isolated-white-bac-3A232DB.jpg",
+        "sha256": "dabc23d8cb2de8d7c53bc30a0a88ace48f35452a435e2255b068dfbd03df21af"
+      },
+      {
+        "filename": "images.jpg",
+        "sha256": "5b13dcdc3d7e493a97ddf1f27b69aac79f66891af4f0601b887e74a2547b15b5"
+      },
+      {
+        "filename": "pexels-photo-4022543.avif",
+        "sha256": "cb7f4ae4fc680c5486433934c8006441ea866e4caed8f833923197dfc114c95c"
+      },
+      {
+        "filename": "product-jpeg-500x500.webp",
+        "sha256": "a62c791c8f43ecd7dc5b793ac61d0144205bc77046ff3b221c00db72973377f0"
+      },
+      {
+        "filename": "stock-photo-a-car-brake-disc-and-axle-being-inspected-during-a-wheel-change-657583255.jpg",
+        "sha256": "90d4dc18502488b3a805845dffb275a2d292f91f2fd4b4896d55359f7f90771d"
+      },
+      {
+        "filename": "stock-photo-close-car-disc-brake-wheel-tire-change-repair-disc-brake.webp",
+        "sha256": "baa5816186813776d79a7ce702c839685109be092932c148e41bb54ec3c6ef43"
+      },
+      {
+        "filename": "WhatsApp Image 2026-10-09 at 7.45.25 AM (1).jpeg",
+        "sha256": "6c7778541c1619af0ed42ac290fb4811305a9bca4e956d2d08934fa246057b7b"
+      },
+      {
+        "filename": "WhatsApp Image 2026-10-09 at 7.45.25 AM.jpeg",
+        "sha256": "b33722ebb86750697ab0295ca9ea4f84c9bb77f8e0cccb0b781209252b0a6964"
+      },
+      {
+        "filename": "WhatsApp Image 2026-10-09 at 7.45.26 AM (1).jpeg",
+        "sha256": "376477f323792e56045f551297c6bfed298daef36f19b09c12862334070f41ce"
+      },
+      {
+        "filename": "WhatsApp Image 2026-10-09 at 7.45.26 AM.jpeg",
+        "sha256": "626e75cc32959878866d4bf94474cd3acb899a2e51e09ea708053754f4812f3f"
+      },
+      {
+        "filename": "WhatsApp Image 2026-10-09 at 7.45.27 AM.jpeg",
+        "sha256": "7d844e279b79502332684f6b6dffea0c24d5c91be5d048071d5f8f1a931a0e20"
+      },
+      {
+        "filename": "WhatsApp Image 2026-10-09 at 7.45.28 AM.jpeg",
+        "sha256": "719974fa98590c44a98423dc84adb55b15712739a7c03fb0515b15ef0ff6e362"
+      }
+    ],
+    "production_validated": false,
+    "source_dataset": "user_provided_brake_disc_correct_folder"
+  },
+  "source_normal_images": 22,
+  "scope": "Experimental brake-disc normal-only model; not production validated."
+}

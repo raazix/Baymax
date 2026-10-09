@@ -64,7 +64,7 @@ def load_image(record):
     return frame
 
 
-def test_metrics(records, scores, threshold):
+def metrics_on_test_split(records, scores, threshold):
     import numpy as np
     from sklearn.metrics import average_precision_score, precision_recall_fscore_support, roc_auc_score
     labels = np.array([row['label'] == 'defect' for row in records], dtype=int)
@@ -140,7 +140,7 @@ def train_category(category, records, extractor, backbone, backbone_digest, devi
     test = [row for row in selected if row['split'] == 'test']
     test_scores = score(test)
     report = {'category': category, 'artifact_sha256': artifact_hash, 'data_source': 'mpdd_proxy',
-              'brake_disc_validated': False, 'metadata': metadata, 'test': test_metrics(test, test_scores, threshold),
+              'brake_disc_validated': False, 'metadata': metadata, 'test': metrics_on_test_split(test, test_scores, threshold),
               'elapsed_seconds': time.time() - began,
               'scores': [{**row, 'anomaly_score': float(value), 'predicted_defective': value > threshold}
                          for rows, values in ((validation, validation_scores), (test, test_scores)) for row, value in zip(rows, values)]}

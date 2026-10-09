@@ -1,0 +1,15 @@
+{
+  "mpdd_metal_plate": {
+    "corrosion": 0.9849,
+    "rule": "maximum corrosion score over 54 MPDD metal_plate train/good images",
+    "train_good_sha256": "ba90ff87c357027560d7a7a29525cd44612a2deafac13ae617883fa7db59a271",
+    "test": {
+      "rust_vs_other_auroc": 0.9793,
+      "rust_recall": "31/37",
+      "good_false_alarms": "1/26",
+      "scratches_flagged": "1/34"
+    },
+    "note": "Presence only: the severe head is not recalibrated for plates, so severe grades on plates are not reported."
+  },
+  "artifact_sha256": "21053a1efd28885bcfccd2069dbabda5639a449537f3a911e63a5b5d0217c22a"
+}

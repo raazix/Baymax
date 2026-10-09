@@ -3,14 +3,14 @@
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion } from 'motion/react';
-import { Activity, Camera, ScanSearch, FileCheck2, Ellipsis, BrainCircuit, SlidersHorizontal, Smartphone, X, Presentation } from 'lucide-react';
+import { Activity, Gauge, Camera, ScanSearch, FileCheck2, Ellipsis, BrainCircuit, SlidersHorizontal, Smartphone, X, Presentation } from 'lucide-react';
 
-type Tab = 'inspection' | 'audit' | 'camera' | 'train' | 'lab' | 'history';
+type Tab = 'inspection' | 'risk' | 'audit' | 'camera' | 'train' | 'lab' | 'history';
 export default function MobileNavigation({ tab, onSelect, onScan, onPhone, onPresenter, busy }: {
   tab: Tab; onSelect: (tab: Tab) => void; onScan: () => void; onPhone: () => void; onPresenter: () => void; busy: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const items = [{ id: 'inspection' as const, label: 'Inspect', Icon: ScanSearch }, { id: 'history' as const, label: 'Sensors', Icon: Activity }, { id: 'audit' as const, label: 'Evidence', Icon: FileCheck2 }];
+  const items = [{ id: 'inspection' as const, label: 'Inspect', Icon: ScanSearch }, { id: 'risk' as const, label: 'Risk', Icon: Gauge }, { id: 'audit' as const, label: 'Evidence', Icon: FileCheck2 }];
   return <>
     <nav className="mobile-navigation" aria-label="Phone workspace">
       {items.slice(0, 1).map(({ id, label, Icon }) => <motion.button whileTap={{ scale: .94 }} key={id} onClick={() => onSelect(id)} aria-current={tab === id ? 'page' : undefined} className={tab === id ? 'active' : ''}>{tab === id && <motion.span layoutId="phone-navigation" className="mobile-nav-indicator" aria-hidden="true" />}<Icon size={21} /><span>{label}</span></motion.button>)}

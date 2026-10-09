@@ -55,7 +55,6 @@ export default function ProcessLab() {
   return <section className="lab">
     <div className="panel lab-inputs">
       <h2>Process what-if lab</h2>
-      <p>Move the readings and watch the whole analytics chain react: <strong>XGBoost</strong> proposes a cause, <strong>TreeSHAP</strong> explains it, <strong>PLSR</strong> forecasts the next lot, and <strong>10,000 Monte Carlo draws</strong> turn that into a risk range. This is the same code path every inspection uses.</p>
       <div className="buttons" role="group" aria-label="Scenario presets">{PRESETS.map(p => <button key={p.name} onClick={() => setReadings(p.values)}>{p.name}</button>)}</div>
       {FIELDS.map(f => {
         const [low, high] = ranges?.[f.key] ?? [readings[f.key] - 50, readings[f.key] + 50];
@@ -65,7 +64,6 @@ export default function ProcessLab() {
           <span className="muted">training range {low.toFixed(f.step < 1 ? 1 : 0)}–{high.toFixed(f.step < 1 ? 1 : 0)}</span>
         </div>;
       })}
-      <p className="footnote">Models are trained on synthetic process history (500 lots × 12 parts). They show how the pipeline reasons, not how your machine behaves.</p>
     </div>
     {error && <div className="error" role="alert">{error}</div>}
     {result && <div className="lab-outputs">
@@ -73,13 +71,10 @@ export default function ProcessLab() {
         <h2>1 · Probable cause <span className="tag">XGBoost</span></h2>
         <h3 className="hypothesis">{human(result.rca.hypothesis)}</h3>
         {probabilities.map(([name, value]) => <div className="contribution" key={name}><div><span>{human(name)}</span><strong>{percent(value)}</strong></div><div className="bar"><i style={{ width: `${value * 100}%` }} /></div></div>)}
-        <p className="footnote">Class scores are uncalibrated and a ranked hypothesis is not a diagnosed root cause.</p>
       </div>
       <div className="panel">
         <h2>2 · Why <span className="tag">exact TreeSHAP</span></h2>
-        <p className="muted">Signed contribution of each reading to the “{human(result.rca.hypothesis)}” score (raw margin units). Green pushes toward this cause; red pushes away.</p>
         {result.rca.feature_contributions.map(item => <div className="contribution" key={item.feature}><div><span>{human(item.feature)}</span><strong>{item.contribution >= 0 ? '+' : ''}{item.contribution.toFixed(2)}</strong></div><div className="bar diverging"><i className={item.contribution >= 0 ? 'pos' : 'neg'} style={{ width: `${(Math.abs(item.contribution) / maxContribution) * 50}%`, [item.contribution >= 0 ? 'left' : 'right']: '50%' }} /></div></div>)}
-        <p className="footnote">Contributions explain the model’s prediction. They do not establish causality.</p>
       </div>
       <div className="panel wide">
         <h2>3 · Next-lot forecast and risk <span className="tag">PLSR + Monte Carlo</span></h2>
@@ -96,7 +91,6 @@ export default function ProcessLab() {
           <text x={result.uncertainty.interval_95[0] * 400} y="137" className="svg-label">95% range {percent(result.uncertainty.interval_95[0])} – {percent(result.uncertainty.interval_95[1])}</text>
         </svg>
         <dl className="risk-details"><div><dt>Chance a simulated lot exceeds the tolerance</dt><dd>{percent(result.uncertainty.breach_probability)}</dd></div><div><dt>Simulations</dt><dd>{result.uncertainty.simulations.toLocaleString()} (seeded, reproducible)</dd></div><div><dt>Calibration residuals resampled</dt><dd>{result.uncertainty.calibration_residual_count}</dd></div></dl>
-        <p className="footnote">A simulated predictive range from resampled held-out forecast errors, not a statistical confidence interval. It excludes model-parameter and input uncertainty. {result.forecast.history_assumption}.{result.forecast.outside_training_range ? ' Readings are outside the training range, so treat this output with extra caution.' : ''}</p>
       </div>
     </div>}
   </section>;

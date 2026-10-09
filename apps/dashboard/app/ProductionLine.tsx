@@ -20,7 +20,7 @@ export default function ProductionLine({ stopped, onCriticalDemo, busy }: { stop
     <AnimatePresence initial={false}>{expanded && <motion.div id="production-visual" className="production-visual" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: reduced ? 0 : .28 }}>
       <ProductionScene stopped={stopped} manualPause={manualPause} />
       <div className="production-stages">{stages.map((stage, index) => <span key={stage} className={stopped && index === 2 ? 'stage-held' : ''}>{stage}</span>)}</div>
-      <div className="production-foot"><button disabled={stopped} onClick={() => setManualPause(value => !value)}>{manualPause ? <Play size={15} /> : <Pause size={15} />}{manualPause ? 'Play animation' : 'Pause animation'}</button><span>Illustrative process. Critical findings require approval and explicit resume.</span></div>
+      <div className="production-foot"><button disabled={stopped} onClick={() => setManualPause(value => !value)}>{manualPause ? <Play size={15} /> : <Pause size={15} />}{manualPause ? 'Play animation' : 'Pause animation'}</button><span>High and critical findings hold this simulation until engineer approval and explicit resume.</span></div>
     </motion.div>}</AnimatePresence>
   </section>;
 }

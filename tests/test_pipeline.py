@@ -1,3 +1,5 @@
+from unittest.mock import patch
+import os
 import hashlib
 import tempfile
 import unittest
@@ -33,7 +35,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result['disposition'], 'recapture')
 
     def test_decision_and_verification_evidence(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'SUPERMEMORY_API_KEY': ''}):   # never write to the real memory store
             previous = main.repo
             main.repo = Repository('sqlite:///' + (Path(directory) / 'test.db').as_posix())
             try:

@@ -28,6 +28,13 @@ async function forward(request: Request, context: { params: Promise<{ path: stri
     const response = await fetch(url, { method: request.method, headers, body, cache: 'no-store', redirect: 'manual', signal });
     const outgoing = new Headers({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     for (const name of ['content-type', 'content-disposition', 'x-request-id', 'www-authenticate']) { const value = response.headers.get(name); if (value) outgoing.set(name, value); }
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json') || contentType.includes('+json')) {
+      const payload = await response.text();
+      try { JSON.parse(payload); }
+      catch { return Response.json({ detail: 'FastAPI returned an incomplete or invalid JSON response. Retry the request; if it continues, check the backend log.' }, { status: 502 }); }
+      return new Response(payload, { status: response.status, headers: outgoing });
+    }
     return new Response(response.body, { status: response.status, headers: outgoing });
   } catch {
     return Response.json({ detail: timeout.aborted ? 'FastAPI request timed out. Check the saved inspection before retrying a decision.' : 'Cannot reach FastAPI. Check the backend on port 8000.' }, { status: timeout.aborted ? 504 : 502 });

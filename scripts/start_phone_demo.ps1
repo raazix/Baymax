@@ -2,16 +2,22 @@ param([ValidateRange(1024,65535)][int]$Port = 3002, [switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $dashboardDirectory = Join-Path $workspace 'apps/dashboard'
+$phoneBuildDirectory = '.next-phone'
 $stateFile = Join-Path $workspace 'data/phone-demo.json'
 $tunnelCommand = Get-Command cloudflared -ErrorAction SilentlyContinue
 if (-not $tunnelCommand) { throw 'Install cloudflared first: winget install Cloudflare.cloudflared' }
 if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { throw "Port $Port is in use. Stop the previous phone demo or choose -Port 3003." }
 if (-not $SkipBuild) {
+    $previousPhoneDist = $env:LINEGUARD_PHONE_DIST
+    $env:LINEGUARD_PHONE_DIST = '1'
     Push-Location $dashboardDirectory
     try { & npm.cmd run build; if ($LASTEXITCODE -ne 0) { throw 'Dashboard build failed.' } }
-    finally { Pop-Location }
+    finally {
+        Pop-Location
+        $env:LINEGUARD_PHONE_DIST = $previousPhoneDist
+    }
 }
-if (-not (Test-Path (Join-Path $dashboardDirectory '.next/BUILD_ID'))) { throw 'Build the dashboard before using -SkipBuild.' }
+if (-not (Test-Path (Join-Path $dashboardDirectory "$phoneBuildDirectory/BUILD_ID"))) { throw 'Build the phone dashboard before using -SkipBuild.' }
 New-Item -ItemType Directory -Path (Join-Path $workspace 'data') -Force | Out-Null
 $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
 $pinBytes = New-Object byte[] 4; $secretBytes = New-Object byte[] 32
@@ -22,7 +28,10 @@ $dashboardProcess = $null; $tunnelProcess = $null
 try {
     $env:LINEGUARD_PHONE_ACCESS_CODE = $pairingCode
     $env:LINEGUARD_PHONE_SESSION_SECRET = [Convert]::ToBase64String($secretBytes)
+    $previousPhoneDist = $env:LINEGUARD_PHONE_DIST
+    $env:LINEGUARD_PHONE_DIST = '1'
     $dashboardProcess = Start-Process -FilePath 'node.exe' -ArgumentList 'node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port',$Port -WorkingDirectory $dashboardDirectory -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $workspace 'data/phone-next.out.log') -RedirectStandardError (Join-Path $workspace 'data/phone-next.err.log')
+    $env:LINEGUARD_PHONE_DIST = $previousPhoneDist
     $env:LINEGUARD_PHONE_ACCESS_CODE = $previousCode; $env:LINEGUARD_PHONE_SESSION_SECRET = $previousSecret
     $ready = $false
     for ($attempt = 0; $attempt -lt 20; $attempt++) {
@@ -52,4 +61,5 @@ try {
     throw
 } finally {
     $env:LINEGUARD_PHONE_ACCESS_CODE = $previousCode; $env:LINEGUARD_PHONE_SESSION_SECRET = $previousSecret
+    $env:LINEGUARD_PHONE_DIST = $previousPhoneDist
 }

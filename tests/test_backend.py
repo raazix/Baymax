@@ -22,7 +22,7 @@ class BackendTests(unittest.TestCase):
         self.previous = main.repo
         main.repo = Repository('sqlite:///' + (Path(self.directory.name) / 'test.db').as_posix())
         self.client = TestClient(main.app)
-        self.auth = patch.dict(os.environ, {'LINEGUARD_API_TOKEN': ''})
+        self.auth = patch.dict(os.environ, {'LINEGUARD_API_TOKEN': '', 'SUPERMEMORY_API_KEY': ''})   # never write to the real memory store
         self.auth.start()
 
     def tearDown(self):
@@ -48,6 +48,7 @@ class BackendTests(unittest.TestCase):
         result = response.json()
         self.assertEqual(result['quality']['profile'], 'camera')
         self.assertEqual(result['context']['input_source'], 'camera')
+        self.assertEqual(result['context']['part_identity']['part_type'], 'unclassified')
         self.assertEqual(result['audit'][0]['actor'], 'camera_scan')
         self.assertEqual(result['disposition'], 'recapture')
         self.assertIsNone(result.get('analytics'))
@@ -55,6 +56,26 @@ class BackendTests(unittest.TestCase):
         stored = self.client.get(f"/api/inspections/{result['id']}").json()
         self.assertEqual(stored['context']['input_source'], 'camera')
         self.assertEqual(self.client.get(result['image_url']).content, image.tobytes())
+
+    def test_reference_upload_identity_is_persisted_and_audited(self):
+        import json
+        from core.part_reference import identify_reference
+        ok, image = cv2.imencode('.png', np.full((480, 640, 3), 128, dtype=np.uint8))
+        self.assertTrue(ok)
+        content = image.tobytes()
+        registry = Path(self.directory.name) / 'references.json'
+        registry.write_text(json.dumps({'format_version': 1, 'part_type': 'brake_disc',
+            'image_sha256': [hashlib.sha256(content).hexdigest()]}), encoding='utf-8')
+        with patch.object(main, 'identify_reference', side_effect=lambda sha, source: identify_reference(sha, source, registry)):
+            response = self.client.post('/api/inspections/upload?model=casting', content=content,
+                                        headers={'Content-Type': 'image/png'})
+        self.assertEqual(response.status_code, 201, response.text)
+        result = response.json()
+        self.assertEqual(result['context']['part_identity']['part_type'], 'brake_disc')
+        self.assertFalse(result['context']['part_identity']['model_prediction'])
+        self.assertTrue(any(event['event'] == 'reference_part_identity_matched' for event in result['audit']))
+        saved = self.client.get(f"/api/inspections/{result['id']}").json()
+        self.assertEqual(saved['context']['part_identity'], result['context']['part_identity'])
 
     def test_upload_input_source_defaults_and_validation(self):
         _, image = cv2.imencode('.png', np.full((480, 640, 3), 128, dtype=np.uint8))

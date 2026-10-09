@@ -1,0 +1,45 @@
+{
+  "creativeNorthStar": "The Clear Inspection Station",
+  "overview": "Purple Material 3 surfaces frame an evidence-led inspection workflow. Bricolage Grotesque, rounded touch targets, and readable evidence keep operators oriented from capture through engineer review.",
+  "colors": {
+    "purple": {
+      "primary": "#67509b",
+      "container": "#eaddff",
+      "onContainer": "#291348"
+    },
+    "surface": {
+      "base": "#fdf7ff",
+      "container": "#f2ecf7",
+      "high": "#eae3f0"
+    },
+    "text": {
+      "ink": "#241e2c",
+      "muted": "#61566c"
+    },
+    "status": {
+      "error": "#9f3029",
+      "errorContainer": "#ffdad4"
+    }
+  },
+  "elevation": {
+    "workingPanel": "0 8px 24px rgba(53, 30, 78, .08), 0 2px 6px rgba(53, 30, 78, .04)",
+    "primaryAction": "0 5px 12px rgba(62, 36, 99, .20)",
+    "arSheet": "0 16px 40px rgba(15, 9, 23, .25)",
+    "gloss": "linear-gradient(145deg, rgba(255, 255, 255, .55), rgba(255, 255, 255, 0) 45%)"
+  },
+  "motion": {
+    "routine": "180ms color, shadow, and transform ease",
+    "reducedMotion": "Respect prefers-reduced-motion; keep evidence visible."
+  },
+  "breakpoints": {
+    "phone": "760px",
+    "tablet": "960px"
+  },
+  "rules": [
+    "Purple signals workflow selection and primary actions.",
+    "Red and amber retain quality severity meaning.",
+    "Body text is 16px; supporting labels are at least 14px.",
+    "Use soft offset shadows and restrained gloss; protect text contrast.",
+    "Keep the part image, finding, and next action together."
+  ]
+}

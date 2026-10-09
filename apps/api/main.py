@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from core.schemas import WhatIfRequest, ReplayRequest, DecisionRequest, VerificationRequest, FrameResponse, JobResponse, InspectionResponse
 from core.replay import create_replay, render_svg
 from core.upload_inspection import create_upload_inspection, PROFILES
+from core.part_reference import identify_reference
 from database.repository import Repository, ConflictError
 from core.clock import utc_now
 from vision.image_ingestion import decode, MAX_BYTES
@@ -22,7 +23,9 @@ from vision.patchcore_anomaly import PatchCoreDetector, PatchCoreUnavailable
 from vision import patchcore_custom
 from analytics.briefing import evidence_packet
 from analytics import assistant
+from analytics import visual_assistant
 from analytics import historical_sensors
+from analytics.lot_history import build_process_context
 from analytics import supermemory
 from pydantic import BaseModel, ConfigDict, Field
 from analytics.service import analyze as analyze_process, status as analytics_status, model_versions as analytics_versions, AnalyticsUnavailable
@@ -33,6 +36,7 @@ logger = logging.getLogger(__name__)
 class AssistantQuestion(BaseModel):
     model_config = ConfigDict(extra='forbid')
     question: str = Field(default='Explain this inspection and the recommended next action.', min_length=1, max_length=1200)
+    purpose: Literal['question', 'summary'] = 'question'
 
 @app.exception_handler(assistant.AssistantUnavailable)
 async def assistant_error(request, error):
@@ -40,7 +44,14 @@ async def assistant_error(request, error):
 
 @app.get('/api/assistant/status')
 def assistant_status():
-    return assistant.status() | {'supermemory': supermemory.status()}
+    return assistant.status() | {'supermemory': supermemory.status(), 'vision_model': os.getenv('NVIDIA_VISION_MODEL', visual_assistant.DEFAULT_MODEL)}
+
+@app.post('/api/inspections/{identifier}/vision-description')
+async def inspection_vision_description(identifier: str):
+    record = await run_in_threadpool(inspection, identifier)
+    frame_id = (record.get('context') or {}).get('frame_id')
+    frame = await run_in_threadpool(repo.get_frame, frame_id) if frame_id else None
+    return await visual_assistant.describe(record, frame)
 
 @app.post('/api/inspections/{identifier}/alert-speech')
 async def inspection_alert_speech(identifier: str):
@@ -51,7 +62,7 @@ async def inspection_alert_speech(identifier: str):
 @app.post('/api/inspections/{identifier}/assistant')
 async def inspection_assistant(identifier: str, question: AssistantQuestion):
     record = await run_in_threadpool(inspection, identifier)
-    return await assistant.explain(record, question.question.strip())
+    return await assistant.explain(record, question.question.strip(), purpose=question.purpose)
 
 @app.get('/api/assistant/responses/{identifier}')
 def assistant_response(identifier: str):
@@ -75,6 +86,8 @@ async def assistant_transcribe(request: Request):
 repo = Repository()
 proxy_detector = ProxyDetector()
 patchcore_detector = PatchCoreDetector()
+from vision.rust_classifier import RustClassifier, RustUnavailable
+rust_detector = RustClassifier()
 custom_detectors: dict[str, PatchCoreDetector] = {}
 MPDD_CATEGORIES = ('bracket_black', 'bracket_brown', 'bracket_white', 'connector', 'metal_plate', 'tubes')
 MPDD_ROOT = Path(__file__).resolve().parents[2] / 'models/patchcore/mpdd'
@@ -259,7 +272,7 @@ def model_status():
     return {'proxy_detection': proxy_detector.status(), 'rotor_segmentation': {'configured': False},
             'quality_profiles': profile_status(),
             'analytics_pipeline': {'mode': analytics_versions()['analytics'], 'production_validated': False},
-            'patchcore': patchcore_detector.status(), 'xgboost_rca': analytics['xgboost_rca'],
+            'patchcore': patchcore_detector.status(), 'corrosion': rust_detector.status(), 'xgboost_rca': analytics['xgboost_rca'],
             'plsr': analytics['plsr'], 'pcr': {**analytics['pcr'], 'role': 'benchmark'},
             'llm': {'enabled': assistant_status['llm_configured'], 'read_only': True},
             'voice_alerts': {'enabled': assistant_status['voice_configured'], 'automatic_levels': ['high', 'critical']},
@@ -298,7 +311,8 @@ def analytics_what_if(request: WhatIfRequest):
     seed = 2026
     result = analyze_process(telemetry, seed)
     residuals = load_artifact()['residuals']
-    result['histogram'] = histogram(result['forecast']['predicted_defect_fraction'], residuals, seed)
+    result['histogram'] = histogram(result['forecast']['predicted_defect_fraction'], residuals, seed,
+                                    interval_scale=result['uncertainty'].get('residual_interval_scale', 1.0))
     result['telemetry'] = telemetry
     result['training_feature_ranges'] = json.loads((Path(__file__).resolve().parents[2] / 'models/xgboost/metadata.json').read_text())['training_feature_ranges']
     return result
@@ -318,7 +332,7 @@ def retry_job(identifier: str):
 @app.post('/api/inspections/upload', status_code=201, response_model=InspectionResponse, response_model_exclude_none=True)
 async def upload_inspection(request: Request, model: Literal['neu', 'casting'] = Query('casting'),
                             input_source: Literal['upload', 'camera'] = Query('upload'),
-                            process_context: Literal['nominal', 'thermal_drift'] = Query('nominal'),
+                            process_context: Literal['history', 'nominal', 'thermal_drift'] = Query('history'),
                             patchcore_model: str = Query('default'),
                             inference_mode: Literal['full', 'sliced'] = Query('full'),
                             tile_size: int = Query(512, ge=128, le=2048), overlap: float = Query(.2, ge=0, le=.5),
@@ -344,8 +358,42 @@ async def upload_inspection(request: Request, model: Literal['neu', 'casting'] =
         run_id = str(uuid4())
         await run_in_threadpool(repo.save_model_run, run | {'id': run_id, 'created_at': utc_now(), 'frame_id': stored['id'],
                                 'image_sha256': stored['sha256'], 'quality': quality})
-    result = await run_in_threadpool(create_upload_inspection, stored, frame.shape, model, process_context, lot_id, machine_id, run, run_id, patchcore_model, frame, part_diameter_mm, mm_per_px)
+    # Known-defect detection runs alongside the anomaly model; the pipeline merges the two spatially.
+    # Every model scans every quality-passed image so all three views can be shown; only the chosen detector makes findings.
+    patchcore_view = None
+    if quality['passed'] and model == 'neu':
+        try:
+            patchcore_view = await run_in_threadpool(patchcore_for(patchcore_model).detect, frame)
+        except (PatchCoreUnavailable, ValueError, HTTPException):
+            patchcore_view = None
+    yolo_run = None
+    if quality['passed'] and model == 'casting':
+        try:
+            yolo_run = await run_in_threadpool(proxy_detector.detect, frame)
+        except (ModelUnavailable, ValueError):
+            yolo_run = None
+    # Corrosion classifier runs on every quality-passed image, whichever defect model was chosen.
+    rust_run = None
+    if quality['passed']:
+        try:
+            rust_run = await run_in_threadpool(rust_detector.detect, frame, patchcore_model if model == 'casting' else None)
+        except RustUnavailable:
+            rust_run = None
+    history_context = history_note = None
+    if process_context == 'history':
+        aggregates = await run_in_threadpool(repo.lot_aggregates, machine_id, 60)
+        history_context = build_process_context(aggregates, machine_id)
+        if history_context is None:
+            history_note = f'No imported sensor history for machine {machine_id}; the nominal simulated preset was used instead.'
+        elif lot_id == 'LOT-UPLOAD':
+            lot_id = history_context['lot_id']        # trace the part to the machine's current lot
+    result = await run_in_threadpool(create_upload_inspection, stored, frame.shape, model, process_context, lot_id, machine_id, run, run_id,
+                                     patchcore_model, frame, part_diameter_mm, mm_per_px, history_context, history_note, yolo_run, rust_run, patchcore_view)
     result['context']['input_source'] = input_source
+    result['context']['part_identity'] = identify_reference(stored['sha256'], input_source)
+    if result['context']['part_identity']['part_type'] == 'brake_disc':
+        result['audit'].append({'at': utc_now(), 'event': 'reference_part_identity_matched',
+                                'actor': 'reference_registry', **result['context']['part_identity']})
     result['audit'][0]['actor'] = 'camera_scan' if input_source == 'camera' else 'upload'
     try: return await run_in_threadpool(repo.save, result)
     except ValueError as error: raise HTTPException(409, str(error))
@@ -399,6 +447,27 @@ async def import_sensor_dataset(request: Request,
     return result | {'machine_count': len({r['machine_id'] for r in readings}),
         'sensor_count': len({r['sensor_name'] for r in readings}), 'provenance': 'User-supplied source label; not independently verified.'}
 
+_risk_cache: dict = {}
+
+@app.get('/api/history/risk-ranking')
+def risk_ranking(refresh: bool = False):
+    """Ranking takes ~30 s against the remote database (every machine and batch is re-scored), so reuse it for 2 minutes."""
+    import time
+    from analytics.fleet_risk import rank_machines
+    cached = _risk_cache.get('result')
+    if cached and not refresh and time.time() - cached[0] < 120:
+        return cached[1] | {'cached_seconds_ago': round(time.time() - cached[0])}
+    result = rank_machines(repo) | {'generated_at': utc_now()}
+    _risk_cache['result'] = (time.time(), result)
+    return result
+
+@app.get('/api/history/lot-context')
+def lot_context(machine_id: str = Query(..., min_length=1, max_length=80)):
+    context = build_process_context(repo.lot_aggregates(machine_id, 60), machine_id)
+    if context is None:
+        raise HTTPException(404, f'No imported lot history for machine {machine_id}.')
+    return context
+
 @app.get('/api/history/sensors/catalog')
 def sensor_catalog():
     return repo.sensor_catalog()
@@ -421,6 +490,15 @@ def sensor_series(machine_id: str = Query(..., min_length=1, max_length=80),
 @app.get('/api/inspections/{identifier}/briefing')
 def briefing(identifier: str): return evidence_packet(inspection(identifier))
 
+async def record_memory_write(identifier: str, kind: str, outcome: dict):
+    if outcome.get('reason') == 'not_configured':
+        return await run_in_threadpool(repo.get, identifier)     # memory disabled: nothing to record
+    def transform(result):
+        result['audit'].append({'at': utc_now(), 'event': 'memory_write', 'kind': kind, 'stored': bool(outcome.get('stored')),
+                                'reason': outcome.get('reason'), 'container': supermemory.CONTAINER})
+        return result
+    return await run_in_threadpool(repo.update, identifier, transform)
+
 @app.post('/api/inspections/{identifier}/decision', response_model=InspectionResponse, response_model_exclude_none=True)
 async def decision(identifier: str, request: DecisionRequest):
     def transform(result):
@@ -433,12 +511,12 @@ async def decision(identifier: str, request: DecisionRequest):
     try:
         result = await run_in_threadpool(repo.update, identifier, transform)
         if request.decision == 'approve':
-            await supermemory.remember_approved(result)
+            result = await record_memory_write(identifier, 'engineer_approved_action', await supermemory.remember_approved(result))
         return result
     except KeyError: raise HTTPException(404, 'Inspection not found')
 
 @app.post('/api/inspections/{identifier}/verification', response_model=InspectionResponse, response_model_exclude_none=True)
-def verification(identifier: str, request: VerificationRequest):
+async def verification(identifier: str, request: VerificationRequest):
     def transform(result):
         if result['action']['status'] != 'approved': raise HTTPException(409, 'Engineer approval required')
         if len(set(request.inspection_ids)) != len(request.inspection_ids): raise HTTPException(422, 'Duplicate inspection evidence')
@@ -460,8 +538,9 @@ def verification(identifier: str, request: VerificationRequest):
         result['action']['status'] = 'verification_recorded'
         result['audit'].append({'at': utc_now(), 'event': 'verification_recorded', 'evidence': request.inspection_ids})
         return result
-    try: return repo.update(identifier, transform)
+    try: result = await run_in_threadpool(repo.update, identifier, transform)
     except KeyError: raise HTTPException(404, 'Inspection not found')
+    return await record_memory_write(identifier, 'verification_outcome', await supermemory.remember_verification(result))
 
 @app.get('/')
 def index():
