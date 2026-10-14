@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ScanSearch, FileCheck2, Camera, BrainCircuit, SlidersHorizontal, Activity, Gauge, Smartphone, Upload, ShieldCheck, LoaderCircle, AlertTriangle, Volume2, Bell, BellRing } from 'lucide-react';
+import { ScanSearch, FileCheck2, Camera, BrainCircuit, SlidersHorizontal, Activity, Gauge, Smartphone, Upload, ShieldCheck, LoaderCircle, AlertTriangle, Volume2, Bell, BellRing, Sparkles } from 'lucide-react';
 import { holdLevel } from './qualityHold';
 import { toast } from 'sonner';
 import MobileNavigation from './MobileNavigation';
@@ -362,7 +362,7 @@ export default function Dashboard() {
       <div className="sidebar-bottom"><span className="connection-dot" /> Local demo workspace<p>Track 3 · Singularity 2026</p></div><details className="sidebar-details"><summary>Model status</summary><ModelStatus /></details>
     </aside>
     <main>
-      <header className="topbar"><div><h1>{workspaceLabels[tab]}</h1><p>Inspect components and review quality decisions.</p></div><div className="topbar-actions"><button className="notification-action" disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'} title={notificationPermission === 'denied' ? 'Allow notifications in your browser settings. In-app alerts remain active.' : 'Enable system notifications for high and critical findings'} onClick={enableNotifications}>{notificationPermission === 'granted' ? <BellRing size={19} /> : <Bell size={19} />}{notificationPermission === 'granted' ? 'Alerts enabled' : 'Enable alerts'}</button><button className="phone-connect-action" onClick={() => setPhoneOpen(true)}><Smartphone size={19} /> Connect phone</button><span className="demo-tag">Proxy models</span>{!presenter && <button className="primary" onClick={startPresenter}>Presenter mode</button>}</div></header>
+      <header className="topbar"><div><h1>{workspaceLabels[tab]}</h1><p>Inspect components and review quality decisions.</p></div><div className="topbar-actions"><button className="notification-action" disabled={notificationPermission === 'unsupported' || notificationPermission === 'denied'} title={notificationPermission === 'denied' ? 'Allow notifications in your browser settings. In-app alerts remain active.' : 'Enable system notifications for high and critical findings'} onClick={enableNotifications}>{notificationPermission === 'granted' ? <BellRing size={19} /> : <Bell size={19} />}{notificationPermission === 'granted' ? 'Alerts enabled' : 'Enable alerts'}</button><button className="phone-connect-action" onClick={() => setPhoneOpen(true)}><Smartphone size={19} /> Connect phone</button><span className="demo-tag">Proxy models</span>{!presenter && <button className="primary presenter-trigger" onClick={startPresenter}><Sparkles size={16} aria-hidden="true" /> Presenter mode</button>}</div></header>
       {presenter && <PresenterBar steps={presenterSteps} busy={busy} status={busy && progress ? progress : demoStatus} onClose={() => setPresenter(false)} />}
       {(tab === 'inspection' || tab === 'audit') && <section className="upload-workspace" aria-label="Image inspection">
         <div className="upload-controls">

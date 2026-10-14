@@ -58,6 +58,13 @@ main { max-width: 1550px; padding: 20px 16px 8px; }
 .topbar-actions button { font-size: 14px; min-height: 44px; padding: 10px 16px; }
 .notification-action { background: var(--md-primary-container); color: var(--md-on-primary-container); border: 0; }
 .demo-tag, .proxy-chip { font-size: 14px; border: 0; background: var(--md-surface-high); color: #4d3c62; border-radius: 10px; padding: 6px 10px; }
+button.primary.presenter-trigger { display: inline-flex; align-items: center; gap: 8px; position: relative; overflow: hidden; background: linear-gradient(135deg, #67509b 0%, #513b82 100%); box-shadow: 0 4px 14px rgba(103, 80, 155, 0.28); }
+button.primary.presenter-trigger:hover { box-shadow: 0 6px 18px rgba(103, 80, 155, 0.38); transform: translateY(-1px); }
+button.primary.presenter-trigger svg { color: #ffde70; animation: sparkle-twinkle 3s ease-in-out infinite; }
+@keyframes sparkle-twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+  50% { transform: scale(1.18) rotate(12deg); opacity: 1; filter: drop-shadow(0 0 4px rgba(255, 222, 112, 0.7)); }
+}
 .upload-workspace { margin-top: 0; padding: 24px; background: var(--md-surface-container); border: 0; border-radius: 28px; }
 .upload-controls { gap: 14px; }
 .capture-model .capture-symbol { width: 52px; height: 52px; border-radius: 18px; background: var(--md-primary-container); color: var(--md-on-primary-container); }
@@ -286,3 +293,4 @@ button.primary, .primary-file {
 }
 .ar-description { padding: 16px; border-radius: 18px; background: var(--md-primary-container); color: var(--md-on-primary-container); margin-top: 14px; }
 .ar-description span { font-size: 14px; }
+
